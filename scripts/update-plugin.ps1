@@ -111,7 +111,9 @@ try {
     # "jar 에셋 자신의 id"로 비교해야 한다.
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest" -Headers @{ "User-Agent" = "apocalypse-updater" }
 
-    $asset = $release.assets | Where-Object { $_.name -like "*.jar" } | Select-Object -First 1
+    # CI가 예전 jar 에셋을 정리하지 못한 채로 여러 개가 남아있는 경우에 대비해(과거에 실제로 발생했던 문제),
+    # 단순히 목록의 첫 번째가 아니라 가장 최근에 올라온 jar를 고른다.
+    $asset = $release.assets | Where-Object { $_.name -like "*.jar" } | Sort-Object -Property created_at -Descending | Select-Object -First 1
     if ($null -eq $asset) {
         Write-Log "오류: 릴리스에서 jar 파일을 찾지 못했습니다."
         exit 1
