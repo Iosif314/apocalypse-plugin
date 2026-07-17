@@ -9,6 +9,7 @@ import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -22,6 +23,8 @@ import java.util.UUID;
  * PersistentDataContainer에 기록된 실제 위장 중인 플레이어에게 그대로 전가한다.
  * 위장 중인 플레이어는 점프가 막혀 있는데, 벽(블록 한 칸 턱)에 막혀 오도가도 못 하는 경우
  * 감지해서 강제로 점프시켜준다.
+ * 위장이 시작된 뒤 새로 접속하는 플레이어에게도 hidePlayer를 적용해서, 위장 중인 진짜 플레이어와
+ * 그 퍼펫 좀비가 동시에 보이는 이중노출을 막는다.
  */
 public class ZombieDisguiseListener implements Listener {
 
@@ -30,10 +33,31 @@ public class ZombieDisguiseListener implements Listener {
     /** 바닐라 점프 한 번의 수직 속도(대략). */
     private static final double JUMP_VELOCITY = 0.42;
 
+    private final Plugin plugin;
     private final NamespacedKey key;
 
     public ZombieDisguiseListener(Plugin plugin) {
+        this.plugin = plugin;
         this.key = new NamespacedKey(plugin, ZombieOutbreakDisaster.KEY_NAME);
+    }
+
+    /**
+     * 위장이 이미 진행 중일 때 새로 접속하면, updateDisguises()가 이 플레이어를 대상으로 hidePlayer를
+     * 부른 적이 없어서 위장 중인 플레이어의 실제 모습이 그대로 보인다(퍼펫 좀비와 동시에). 접속 시점에
+     * 현재 위장 중인 플레이어 전원을 이 플레이어에게도 즉시 숨겨서 맞춰준다.
+     */
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        Player joined = event.getPlayer();
+        for (UUID disguisedId : ZombieOutbreakDisaster.DISGUISED_PLAYERS) {
+            if (disguisedId.equals(joined.getUniqueId())) {
+                continue;
+            }
+            Player disguised = Bukkit.getPlayer(disguisedId);
+            if (disguised != null) {
+                joined.hidePlayer(plugin, disguised);
+            }
+        }
     }
 
     @EventHandler

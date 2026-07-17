@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * 등록된 재앙들을 관리한다. 각 재앙은 자신의 config 섹션에 있는
@@ -154,6 +155,8 @@ public class DisasterManager {
             double chancePercent = plugin.getConfig().getDouble(base + "auto-trigger-chance", dangerLevel.getDefaultTriggerChancePercent());
             if (random.nextDouble() * 100.0 < chancePercent) {
                 List<World> candidateWorlds = getConfiguredWorlds();
+                // 날씨/낮밤 등 바닐라 시스템에 의존해 이 재앙이 사실상 무력화되는 차원(네더/엔드 등)은 후보에서 뺀다.
+                candidateWorlds.removeIf(w -> !disaster.getSupportedEnvironments().contains(w.getEnvironment()));
                 candidateWorlds.removeIf(w -> PlayerFilter.targetable(w.getPlayers()).isEmpty());
                 if (!candidateWorlds.isEmpty()) {
                     World world = candidateWorlds.get(random.nextInt(candidateWorlds.size()));
@@ -183,7 +186,8 @@ public class DisasterManager {
         }
         World world = candidateWorlds.get(random.nextInt(candidateWorlds.size()));
 
-        Disaster disaster = pickWeightedDisaster();
+        // 이 월드(차원)에서 정상 작동하는 재앙만 후보로 삼는다 — 네더/엔드에서 폭풍우 같은 날씨 의존 재앙이 뽑히지 않도록.
+        Disaster disaster = pickWeightedDisaster(null, null, world.getEnvironment());
         if (disaster == null) {
             return false;
         }
@@ -224,7 +228,7 @@ public class DisasterManager {
 
         if (showWarning) {
             String rawWarning = section.getString("warning-message", "&c&l재앙이 다가옵니다!");
-            broadcast(ColorUtil.parse("&c&l[경고] " + rawWarning));
+            broadcast(world, ColorUtil.parse("&c&l[경고] " + rawWarning));
         }
 
         Runnable spawn = () -> {
@@ -232,11 +236,11 @@ public class DisasterManager {
             if (players.isEmpty()) {
                 return;
             }
-            DisasterContext context = new DisasterContext(plugin, world, players, finalSection, immediate, new ArrayList<>());
+            DisasterContext context = new DisasterContext(plugin, world, players, finalSection, immediate, new ArrayList<>(), new HashMap<>());
             pruneFinishedRuns();
             activeRuns.add(new ActiveRun(disaster, context));
             disaster.trigger(context);
-            broadcast(appearMessage);
+            broadcast(world, appearMessage);
         };
 
         if (immediate) {
@@ -340,16 +344,12 @@ public class DisasterManager {
         return ids;
     }
 
-    private Disaster pickWeightedDisaster() {
-        return pickWeightedDisaster(null);
-    }
-
     /**
      * 가중치 기반으로 재앙 하나를 무작위로 고른다. excludeId와 id가 같은 재앙은 후보에서 제외된다.
      * "아포칼립스"처럼 다른 재앙을 연쇄로 골라야 하는 재앙이 자기 자신을 다시 고르지 않도록 쓸 수 있다.
      */
     public Disaster pickWeightedDisaster(String excludeId) {
-        return pickWeightedDisaster(excludeId, null);
+        return pickWeightedDisaster(excludeId, null, (Predicate<Disaster>) null);
     }
 
     /**
@@ -358,6 +358,26 @@ public class DisasterManager {
      * 자기 자신뿐 아니라 "차원 소멸" 같은 6단계 초희귀 재앙까지 후보에서 빼는 용도로 쓸 수 있다.
      */
     public Disaster pickWeightedDisaster(String excludeId, DangerLevel excludeLevel) {
+        return pickWeightedDisaster(excludeId, excludeLevel, (Predicate<Disaster>) null);
+    }
+
+    /**
+     * 가중치 기반으로 재앙 하나를 무작위로 고른다. excludeId/excludeLevel은 위 오버로드와 같고,
+     * environment가 주어지면 그 차원에서 {@link Disaster#getSupportedEnvironments()}가 지원하지 않는
+     * 재앙도 후보에서 제외된다(null이면 차원 제한 없음). 네더/엔드에서 날씨 의존 재앙이 뽑히지 않게 하는 용도.
+     */
+    public Disaster pickWeightedDisaster(String excludeId, DangerLevel excludeLevel, World.Environment environment) {
+        return pickWeightedDisaster(excludeId, excludeLevel,
+                environment == null ? null : d -> d.getSupportedEnvironments().contains(environment));
+    }
+
+    /**
+     * 가중치 기반으로 재앙 하나를 무작위로 고른다. excludeId/excludeLevel은 위 오버로드와 같고,
+     * disasterFilter가 주어지면 그 조건(test)을 만족하지 않는 재앙도 후보에서 제외된다(null이면 제한 없음).
+     * 아포칼립스가 연쇄 재앙을 고를 때, "지금 재앙이 발동한 차원"이 아니라 "플레이어가 있는 다른 차원에서라도
+     * 실행 가능한지"까지 넓게 봐야 하는 경우처럼 단순 차원 일치보다 복잡한 조건이 필요할 때 쓴다.
+     */
+    public Disaster pickWeightedDisaster(String excludeId, DangerLevel excludeLevel, Predicate<Disaster> disasterFilter) {
         List<Disaster> pool = new ArrayList<>();
         List<Integer> weights = new ArrayList<>();
         int totalWeight = 0;
@@ -367,6 +387,9 @@ public class DisasterManager {
                 continue;
             }
             if (excludeLevel != null && disaster.getDangerLevel() == excludeLevel) {
+                continue;
+            }
+            if (disasterFilter != null && !disasterFilter.test(disaster)) {
                 continue;
             }
             if (!toggleStore.isDisasterEnabled(disaster.getId())) {
@@ -397,6 +420,27 @@ public class DisasterManager {
         return pool.get(pool.size() - 1);
     }
 
+    /**
+     * disaster를 실제로 실행할 수 있는 월드를 찾는다. preferredWorld가 이 재앙을 지원하고 플레이어도 있으면
+     * 그대로 반환하고, 아니면 settings.worlds 중 이 재앙을 지원하면서 플레이어가 있는 다른 월드를 무작위로 고른다.
+     * 그런 월드가 하나도 없으면 null. 아포칼립스가 네더/엔드에서 발동했을 때, 그 차원에서 무력화되는 재앙이라도
+     * 오버월드처럼 플레이어가 있는 다른 지원 차원이 있으면 거기서 대신 실행할 수 있게 하는 데 쓴다.
+     */
+    public World findWorldFor(Disaster disaster, World preferredWorld) {
+        if (preferredWorld != null
+                && disaster.getSupportedEnvironments().contains(preferredWorld.getEnvironment())
+                && !PlayerFilter.targetable(preferredWorld.getPlayers()).isEmpty()) {
+            return preferredWorld;
+        }
+        List<World> candidates = getConfiguredWorlds();
+        candidates.removeIf(w -> !disaster.getSupportedEnvironments().contains(w.getEnvironment()));
+        candidates.removeIf(w -> PlayerFilter.targetable(w.getPlayers()).isEmpty());
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        return candidates.get(random.nextInt(candidates.size()));
+    }
+
     private List<World> getConfiguredWorlds() {
         List<String> names = plugin.getConfig().getStringList("settings.worlds");
         List<World> worlds = new ArrayList<>();
@@ -409,7 +453,10 @@ public class DisasterManager {
         return worlds;
     }
 
-    private void broadcast(Component message) {
-        Bukkit.broadcast(message);
+    /** 이 재앙이 실제로 발생 중인 월드의 플레이어에게만 메시지를 보낸다. 다른 월드 플레이어는 받지 않는다. */
+    private void broadcast(World world, Component message) {
+        for (Player player : world.getPlayers()) {
+            player.sendMessage(message);
+        }
     }
 }

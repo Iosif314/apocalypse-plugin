@@ -72,7 +72,7 @@ public class ApocalypseDisaster implements Disaster {
         int minChain = Math.max(1, section.getInt("chain-count.min", 2));
         int maxChain = Math.max(minChain, section.getInt("chain-count.max", 5));
 
-        List<Disaster> chainPool = getEligibleChainDisasters(plugin);
+        List<Disaster> chainPool = getEligibleChainDisasters(plugin, world);
 
         long offset = 0;
 
@@ -85,8 +85,8 @@ public class ApocalypseDisaster implements Disaster {
             // 마지막 글자는 다음 단계(말줄임표)가 더 느린 템포로 뜨므로, 그때까지 화면에 남아있도록 유지 시간을 늘린다.
             long stay = (i == chars.length) ? suspenseFrameTicks + 2 : letterFrameTicks + 2;
             schedule(context, offset, () -> {
-                showTitle(titleComponent, Component.empty(), stay);
-                playRouletteTick();
+                showTitle(world, titleComponent, Component.empty(), stay);
+                playRouletteTick(world);
             });
         }
         // 글자가 다 공개된 뒤, 말줄임표(.)도 깜빡임 없이 한 개씩 차례로 붙여서 보여준다.
@@ -98,8 +98,8 @@ public class ApocalypseDisaster implements Disaster {
             // 마지막 점은 "아포칼립스" 타이틀이 뜨기 직전까지 화면에 남아있도록 유지 시간을 늘린다.
             long stay = (dotCount == 3) ? titleHoldTicks + 2 : suspenseFrameTicks + 2;
             schedule(context, offset, () -> {
-                showTitle(dotsTitle, Component.empty(), stay);
-                playRouletteTick();
+                showTitle(world, dotsTitle, Component.empty(), stay);
+                playRouletteTick(world);
             });
         }
 
@@ -107,8 +107,8 @@ public class ApocalypseDisaster implements Disaster {
         Component apocalypseTitle = Component.text(getDisplayName(), NamedTextColor.DARK_RED);
         offset += titleHoldTicks;
         schedule(context, offset, () -> {
-            showTitle(apocalypseTitle, Component.empty(), rouletteSpinTicks + 2);
-            playApocalypseRoar();
+            showTitle(world, apocalypseTitle, Component.empty(), rouletteSpinTicks + 2);
+            playApocalypseRoar(world);
         });
 
         if (chainPool.isEmpty()) {
@@ -123,16 +123,16 @@ public class ApocalypseDisaster implements Disaster {
             Component subtitle = Component.text(String.valueOf(spinValue), NamedTextColor.RED);
             offset += rouletteSpinTicks;
             schedule(context, offset, () -> {
-                showTitle(apocalypseTitle, subtitle, rouletteSpinTicks + 2);
-                playRouletteTick();
+                showTitle(world, apocalypseTitle, subtitle, rouletteSpinTicks + 2);
+                playRouletteTick(world);
             });
         }
         Component landedNumber = Component.text(String.valueOf(chainCount), NamedTextColor.RED);
         offset += rouletteSpinTicks;
         // 룰렛이 멈춘 뒤(실제 값이 뜬 채로) "연속 N회 재앙 발생" 문구가 뜨기 직전까지 화면에 남아있는다.
         schedule(context, offset, () -> {
-            showTitle(apocalypseTitle, landedNumber, chainAnnounceHoldTicks + 2);
-            playRouletteTick();
+            showTitle(world, apocalypseTitle, landedNumber, chainAnnounceHoldTicks + 2);
+            playRouletteTick(world);
         });
 
         // 4) "연속 N회 재앙 발생"
@@ -141,8 +141,8 @@ public class ApocalypseDisaster implements Disaster {
         offset += chainAnnounceHoldTicks;
         // "연속 N회 재앙 발생" 문구는 첫 재앙 이름이 뜨기 직전까지 화면에 남아있는다.
         schedule(context, offset, () -> {
-            showTitle(apocalypseTitle, chainAnnounce, chainAnnounceHoldTicks + 2);
-            Bukkit.broadcast(chainChatMessage);
+            showTitle(world, apocalypseTitle, chainAnnounce, chainAnnounceHoldTicks + 2);
+            broadcastToWorld(world, chainChatMessage);
         });
         // "연속 N회 재앙 발생" 문구가 chainAnnounceHoldTicks만큼 다 유지된 뒤에야 재앙 룰렛을 시작한다.
         offset += chainAnnounceHoldTicks;
@@ -157,13 +157,21 @@ public class ApocalypseDisaster implements Disaster {
                     offset += disasterSpinTicks;
                 }
                 schedule(context, offset, () -> {
-                    showTitle(apocalypseTitle, subtitle, disasterSpinTicks + 2);
-                    playRouletteTick();
+                    showTitle(world, apocalypseTitle, subtitle, disasterSpinTicks + 2);
+                    playRouletteTick(world);
                 });
             }
 
-            Disaster chosen = disasterManager.pickWeightedDisaster(getId(), DangerLevel.LEVEL_6);
+            // 지금 재앙이 발동한 차원(world)에서 무력화되는 재앙(폭풍우 등)이라도, 플레이어가 있는
+            // 다른 지원 차원(예: 오버월드)이 있으면 거기서 대신 실행할 수 있도록 폭넓게 후보를 고른다.
+            Disaster chosen = disasterManager.pickWeightedDisaster(getId(), DangerLevel.LEVEL_6,
+                    (Disaster d) -> disasterManager.findWorldFor(d, world) != null);
             if (chosen == null) {
+                break;
+            }
+            // 실제로 이 재앙을 실행할 차원. world 자신이 지원 안 하면(그리고 플레이어도 없으면) 다른 차원으로 넘어간다.
+            World executeWorld = disasterManager.findWorldFor(chosen, world);
+            if (executeWorld == null) {
                 break;
             }
             Component landed = Component.text(chosen.getDisplayName(), chosen.getDangerLevel().getColor());
@@ -173,19 +181,28 @@ public class ApocalypseDisaster implements Disaster {
             long stay = hasNextStep ? chainStepGapTicks + 2 : disasterLandHoldTicks;
             offset += disasterSpinTicks;
             schedule(context, offset, () -> {
-                showTitle(apocalypseTitle, landed, stay);
-                playDangerSound(chosen.getDangerLevel());
-                Bukkit.broadcast(landedChatMessage);
+                // 룰렛 연출 자체는 아포칼립스가 실제로 발동한 차원(world)에서 계속 보여준다.
+                showTitle(world, apocalypseTitle, landed, stay);
+                playDangerSound(world, chosen.getDangerLevel());
+                broadcastToWorld(world, landedChatMessage);
+                // 이 재앙을 다른 차원(executeWorld)에서 실행하는 경우, 그 차원 플레이어들에게도 별도로 알린다.
+                if (executeWorld != world) {
+                    broadcastToWorld(executeWorld, landedChatMessage);
+                }
                 // 아포칼립스 자체의 경고를 이미 띄웠으니, 연쇄로 터지는 각 재앙은 자기 자신의 "곧 온다" 경고 없이 바로 시작한다.
-                disasterManager.triggerDisaster(chosen.getId(), world, false);
+                disasterManager.triggerDisaster(chosen.getId(), executeWorld, false);
             });
 
             offset += chainStepGapTicks;
         }
     }
 
-    /** 연쇄 대상이 될 수 있는(자기 자신 제외, 6단계 제외, 활성화됨, 가중치 0 초과) 재앙 목록. */
-    private List<Disaster> getEligibleChainDisasters(Plugin plugin) {
+    /**
+     * 연쇄 대상이 될 수 있는(자기 자신 제외, 6단계 제외, 활성화됨, 가중치 0 초과) 재앙 목록.
+     * 지금 재앙이 발동한 차원(world) 자신이 지원 안 해도, 플레이어가 있는 다른 지원 차원이 있으면 후보에 남는다
+     * (실제로 그 재앙을 어느 차원에서 실행할지는 {@link DisasterManager#findWorldFor}가 매 단계마다 다시 정한다).
+     */
+    private List<Disaster> getEligibleChainDisasters(Plugin plugin, World world) {
         List<Disaster> pool = new ArrayList<>();
         for (Disaster disaster : disasterManager.getDisasters().values()) {
             if (disaster.getId().equals(getId())) {
@@ -193,6 +210,10 @@ public class ApocalypseDisaster implements Disaster {
             }
             // "차원 소멸" 같은 6단계 초희귀 재앙은 아포칼립스 연쇄로도 나오지 않게 제외한다.
             if (disaster.getDangerLevel() == DangerLevel.LEVEL_6) {
+                continue;
+            }
+            // 이 재앙을 실행할 수 있는 차원이 하나도 없으면(플레이어가 있는 지원 차원이 전혀 없으면) 후보에서 뺀다.
+            if (disasterManager.findWorldFor(disaster, world) == null) {
                 continue;
             }
             if (!disasterManager.isDisasterEnabled(disaster.getId())) {
@@ -211,30 +232,37 @@ public class ApocalypseDisaster implements Disaster {
         context.track(Bukkit.getScheduler().runTaskLater(context.plugin(), action, delayTicks));
     }
 
-    private void showTitle(Component title, Component subtitle, long stayTicks) {
+    /** 재앙이 실제로 발생 중인 월드의 플레이어에게만 메시지를 보낸다. 다른 월드 플레이어는 받지 않는다. */
+    private void broadcastToWorld(World world, Component message) {
+        for (Player player : world.getPlayers()) {
+            player.sendMessage(message);
+        }
+    }
+
+    private void showTitle(World world, Component title, Component subtitle, long stayTicks) {
         Title.Times times = Title.Times.times(Duration.ZERO, Duration.ofMillis(stayTicks * 50L), Duration.ZERO);
         Title titleObj = Title.title(title, subtitle, times);
-        for (Player player : Bukkit.getOnlinePlayers()) {
+        for (Player player : world.getPlayers()) {
             player.showTitle(titleObj);
         }
     }
 
-    private void playDangerSound(DangerLevel level) {
-        for (Player player : Bukkit.getOnlinePlayers()) {
+    private void playDangerSound(World world, DangerLevel level) {
+        for (Player player : world.getPlayers()) {
             player.playSound(player.getLocation(), level.getSound(), level.getVolume(), level.getPitch());
         }
     }
 
     /** 룰렛이 깜빡일 때, 그리고 글자가 한 자씩 공개될 때마다 나는 틱 소리. */
-    private void playRouletteTick() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
+    private void playRouletteTick(World world) {
+        for (Player player : world.getPlayers()) {
             player.playSound(player.getLocation(), Sound.BLOCK_DISPENSER_DISPENSE, 1.0f, 1.0f);
         }
     }
 
     /** "아포칼립스" 타이틀이 뜨는 순간 나는 포효 소리. */
-    private void playApocalypseRoar() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
+    private void playApocalypseRoar(World world) {
+        for (Player player : world.getPlayers()) {
             player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1.0f, 1.0f);
         }
     }

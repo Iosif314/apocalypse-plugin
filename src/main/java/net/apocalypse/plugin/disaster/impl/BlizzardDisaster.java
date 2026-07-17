@@ -67,6 +67,12 @@ public class BlizzardDisaster implements Disaster {
         return DangerLevel.LEVEL_2;
     }
 
+    /** 눈/서리는 바닐라 날씨 API를 쓰진 않지만, 하늘이 뚫린 오버월드를 전제로 한 재앙이라 네더/엔드는 제외한다. */
+    @Override
+    public Set<World.Environment> getSupportedEnvironments() {
+        return EnumSet.of(World.Environment.NORMAL);
+    }
+
     @Override
     public void trigger(DisasterContext context) {
         Plugin plugin = context.plugin();

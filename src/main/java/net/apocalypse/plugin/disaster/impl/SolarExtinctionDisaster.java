@@ -14,8 +14,8 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * 지속 시간 동안 태양이 사라진 것처럼 낮/밤 주기를 멈추고 강제로 밤으로 고정한다.
@@ -26,9 +26,7 @@ import java.util.Map;
 public class SolarExtinctionDisaster implements Disaster {
 
     private static final long NIGHT_TIME = 18000L;
-
-    // /apoc stop으로 강제 중단됐을 때도 원래 시간으로 되돌릴 수 있도록, 월드별로 소멸 직전 시간을 기억해둔다.
-    private final Map<World, Long> originalTimes = new HashMap<>();
+    private static final String STATE_ORIGINAL_TIME = "originalTime";
 
     @Override
     public String getId() {
@@ -45,6 +43,12 @@ public class SolarExtinctionDisaster implements Disaster {
         return DangerLevel.LEVEL_1;
     }
 
+    /** 낮/밤 주기와 시간을 조작하는 재앙인데, 네더/엔드는 낮/밤 주기 자체가 없어 효과가 체감되지 않는다. */
+    @Override
+    public Set<World.Environment> getSupportedEnvironments() {
+        return EnumSet.of(World.Environment.NORMAL);
+    }
+
     @Override
     public void trigger(DisasterContext context) {
         Plugin plugin = context.plugin();
@@ -55,8 +59,10 @@ public class SolarExtinctionDisaster implements Disaster {
         long darknessIntervalTicks = Math.max(20, section.getLong("darkness-interval-ticks", 60));
         int darknessDurationTicks = (int) (Math.max(1, section.getLong("darkness-duration-seconds", 5)) * 20L);
 
-        // 태양이 돌아왔을 때 원래 흐름대로 이어지도록, 소멸시키기 전의 시간을 기억해둔다.
-        originalTimes.put(world, world.getTime());
+        // 태양이 돌아왔을 때 원래 흐름대로 이어지도록, 소멸시키기 전의 시간을 이 트리거 전용 state에 기억해둔다.
+        // 인스턴스 필드(월드별 Map)에 담으면 같은 월드에서 두 번 이상 겹쳐 발동할 때 나중 트리거가 이미
+        // 밤으로 바뀐 시간을 "원래 시간"으로 덮어써버려, 복구해도 낮이 돌아오지 않게 된다.
+        context.putState(STATE_ORIGINAL_TIME, world.getTime());
 
         world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
         world.setTime(NIGHT_TIME);
@@ -71,7 +77,7 @@ public class SolarExtinctionDisaster implements Disaster {
 
                 if (elapsed >= durationTicks) {
                     cancel();
-                    restoreSun(world);
+                    restoreSun(context);
                 }
             }
         }.runTaskTimer(plugin, darknessIntervalTicks, darknessIntervalTicks));
@@ -80,14 +86,14 @@ public class SolarExtinctionDisaster implements Disaster {
     /** /apoc stop으로 강제 중단됐을 때, 자기 자신의 마지막 틱에서만 되돌리던 낮/밤 주기와 시간을 즉시 복구한다. */
     @Override
     public void onStop(DisasterContext context) {
-        restoreSun(context.world());
+        restoreSun(context);
     }
 
-    private void restoreSun(World world) {
-        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, true);
-        Long originalTime = originalTimes.remove(world);
+    private void restoreSun(DisasterContext context) {
+        context.world().setGameRule(GameRule.DO_DAYLIGHT_CYCLE, true);
+        Long originalTime = context.getState(STATE_ORIGINAL_TIME);
         if (originalTime != null) {
-            world.setTime(originalTime);
+            context.world().setTime(originalTime);
         }
     }
 

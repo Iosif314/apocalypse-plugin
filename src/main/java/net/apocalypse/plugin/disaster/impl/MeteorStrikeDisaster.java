@@ -6,7 +6,6 @@ import net.apocalypse.plugin.disaster.DisasterContext;
 import net.apocalypse.plugin.util.ColorUtil;
 import net.apocalypse.plugin.util.PlayerFilter;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -39,11 +38,9 @@ import java.util.UUID;
  */
 public class MeteorStrikeDisaster implements Disaster {
 
-    private final Random random = new Random();
+    private static final String STATE_VISUALS = "visuals";
 
-    // /apoc stop으로 비행 중에 강제로 멈추면 예약된 작업만 취소해선 이 비주얼(블록 디스플레이)이 공중에 남으므로,
-    // onStop에서 같이 지울 수 있도록 현재 날아가고 있는 운석의 비주얼을 기억해둔다.
-    private List<BlockDisplay> currentVisuals = new ArrayList<>();
+    private final Random random = new Random();
 
     @Override
     public String getId() {
@@ -108,7 +105,10 @@ public class MeteorStrikeDisaster implements Disaster {
                 .replace("%player%", target.getName());
 
         List<BlockDisplay> visuals = spawnMeteorVisual(world, spawnLoc, visualDiameter);
-        currentVisuals = visuals;
+        // /apoc stop으로 비행 중에 강제로 멈추면 예약된 작업만 취소해선 이 비주얼(블록 디스플레이)이 공중에 남으므로,
+        // onStop에서 같이 지울 수 있도록 이 트리거 전용 state에 기억해둔다. 인스턴스 필드에 담으면 운석이
+        // 두 번 이상 겹쳐 날아갈 때 서로의 비주얼 추적을 덮어쓰게 되므로 트리거별로 분리해야 한다.
+        context.putState(STATE_VISUALS, visuals);
 
         flyMeteor(context, plugin, world, spawnLoc, impactLoc, visuals, travelSpeed, visualDiameter, ColorUtil.parse(revealMessage),
                 craterRadius, netherrackShell, cellsPerTick, minOres, maxOres, oreBlocks,
@@ -119,12 +119,15 @@ public class MeteorStrikeDisaster implements Disaster {
     /** /apoc stop으로 강제 중단됐을 때, 비행 중이던 운석 비주얼이 공중에 남지 않도록 지운다. */
     @Override
     public void onStop(DisasterContext context) {
-        for (BlockDisplay display : currentVisuals) {
+        List<BlockDisplay> visuals = context.getState(STATE_VISUALS);
+        if (visuals == null) {
+            return;
+        }
+        for (BlockDisplay display : visuals) {
             if (!display.isDead()) {
                 display.remove();
             }
         }
-        currentVisuals = new ArrayList<>();
     }
 
     private List<Material> readOreBlocks(ConfigurationSection section) {
@@ -213,7 +216,9 @@ public class MeteorStrikeDisaster implements Disaster {
 
                 if (!announced && current.getY() <= midY) {
                     announced = true;
-                    Bukkit.broadcast(revealMessage);
+                    for (Player p : world.getPlayers()) {
+                        p.sendMessage(revealMessage);
+                    }
                 }
 
                 if (arrived) {

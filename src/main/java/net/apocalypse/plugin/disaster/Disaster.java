@@ -1,5 +1,10 @@
 package net.apocalypse.plugin.disaster;
 
+import org.bukkit.World;
+
+import java.util.EnumSet;
+import java.util.Set;
+
 /**
  * 새로운 재앙을 추가하려면 이 인터페이스를 구현하고
  * DisasterManager#register 로 등록한 뒤 config.yml의 disasters 섹션에
@@ -26,5 +31,16 @@ public interface Disaster {
      * 예약된 작업 취소만으로 충분히 안전하게 끝나는 재앙(순간적인 파괴 등)은 굳이 구현하지 않아도 됩니다.
      */
     default void onStop(DisasterContext context) {
+    }
+
+    /**
+     * 이 재앙이 정상적으로 작동하는 차원(월드 Environment) 집합. 기본은 전부 허용.
+     * 날씨(setStorm 등)나 낮/밤 주기처럼 네더/엔드에는 없는 바닐라 시스템에 의존해서 그 차원에서는
+     * 사실상 무력화되는 재앙만 이 메서드를 오버라이드해서 해당 차원을 제외시키면 된다.
+     * DisasterManager의 자동/랜덤 발생 선택과 ApocalypseDisaster의 연쇄 선택이 이 값을 보고 걸러낸다.
+     * (수동 /apoc trigger &lt;id&gt;처럼 종류를 직접 지정한 발동은 이 제한을 받지 않는다 — 관리자의 명시적 선택이므로.)
+     */
+    default Set<World.Environment> getSupportedEnvironments() {
+        return EnumSet.allOf(World.Environment.class);
     }
 }

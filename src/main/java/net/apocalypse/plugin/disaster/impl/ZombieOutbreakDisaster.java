@@ -49,8 +49,7 @@ public class ZombieOutbreakDisaster implements Disaster {
      */
     public static final Set<UUID> DISGUISED_PLAYERS = ConcurrentHashMap.newKeySet();
 
-    // /apoc stop으로 강제 중단됐을 때도 위장을 전부 풀 수 있도록, trigger()의 지역 변수가 아니라 필드로 둔다.
-    private final Map<UUID, Zombie> disguisePuppets = new HashMap<>();
+    private static final String STATE_PUPPETS = "puppets";
 
     private final Random random = new Random();
 
@@ -88,6 +87,12 @@ public class ZombieOutbreakDisaster implements Disaster {
         NamespacedKey key = new NamespacedKey(plugin, KEY_NAME);
         NamespacedKey jumpModifierKey = new NamespacedKey(plugin, JUMP_MODIFIER_KEY_NAME);
 
+        // /apoc stop으로 강제 중단됐을 때도 위장을 전부 풀 수 있어야 하므로, onStop()에서도 꺼내 쓸 수 있게
+        // 이 트리거 전용 state에 담아둔다. 인스턴스 필드에 담으면 좀비 창궐이 두 번 이상 겹쳐 발동할 때
+        // 서로의 퍼펫 목록을 덮어써서, 먼저 끝난 쪽이 나중 쪽 위장까지 강제로 풀어버리게 된다.
+        Map<UUID, Zombie> disguisePuppets = new HashMap<>();
+        context.putState(STATE_PUPPETS, disguisePuppets);
+
         // 좀비는 주기적인 웨이브가 아니라, 발동 시점에 플레이어마다 한 번에 몰아서 소환한다.
         for (Player player : PlayerFilter.targetable(world.getPlayers())) {
             spawnZombieWave(world, player.getLocation(), minZombies, maxZombies, spawnRadius);
@@ -113,6 +118,10 @@ public class ZombieOutbreakDisaster implements Disaster {
     /** /apoc stop으로 강제 중단됐을 때, 자기 자신의 마지막 틱에서만 풀어주던 위장을 즉시 전부 해제한다. */
     @Override
     public void onStop(DisasterContext context) {
+        Map<UUID, Zombie> disguisePuppets = context.getState(STATE_PUPPETS);
+        if (disguisePuppets == null) {
+            return;
+        }
         Plugin plugin = context.plugin();
         NamespacedKey jumpModifierKey = new NamespacedKey(plugin, JUMP_MODIFIER_KEY_NAME);
         clearAllDisguises(plugin, disguisePuppets, jumpModifierKey);

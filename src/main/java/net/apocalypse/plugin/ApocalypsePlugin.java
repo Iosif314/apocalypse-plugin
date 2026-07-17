@@ -13,6 +13,7 @@ import net.apocalypse.plugin.disaster.impl.SinkholeDisaster;
 import net.apocalypse.plugin.disaster.impl.SolarExtinctionDisaster;
 import net.apocalypse.plugin.disaster.impl.StormDisaster;
 import net.apocalypse.plugin.disaster.impl.ZombieOutbreakDisaster;
+import net.apocalypse.plugin.listener.AnnihilationZoneListener;
 import net.apocalypse.plugin.listener.DisasterCleanupListener;
 import net.apocalypse.plugin.listener.ZombieDisguiseListener;
 import org.bukkit.command.PluginCommand;
@@ -43,8 +44,13 @@ public final class ApocalypsePlugin extends JavaPlugin {
         disasterManager.register(new ApocalypseDisaster(disasterManager));
         // 새 재앙을 추가할 때는 여기에 disasterManager.register(new XxxDisaster()); 한 줄만 추가하면 됩니다.
 
+        // 이전에 차원 소멸로 지워진 청크가 있으면 여기서 다시 불러와, 재시작/리로드 후에도
+        // 그 공허의 접근 경고/진입 즉사/블록 설치 거부 효과가 끊기지 않고 이어지게 한다.
+        DimensionalAnnihilationDisaster.loadPersistedVoidChunks(this);
+
         getServer().getPluginManager().registerEvents(new ZombieDisguiseListener(this), this);
         getServer().getPluginManager().registerEvents(new DisasterCleanupListener(this), this);
+        getServer().getPluginManager().registerEvents(new AnnihilationZoneListener(this), this);
 
         ApocalypseCommand commandHandler = new ApocalypseCommand(this, disasterManager);
         PluginCommand command = getCommand("apocalypse");

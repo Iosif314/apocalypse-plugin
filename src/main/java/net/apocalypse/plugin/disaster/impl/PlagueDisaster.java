@@ -17,11 +17,11 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 좀비 창궐과 달리 몹 소환 없이, 처음 감염된 몇 명으로부터 시작해 가까이 있는 다른 플레이어에게
@@ -31,8 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class PlagueDisaster implements Disaster {
 
-    /** 현재 감염 중인 플레이어 UUID 집합. */
-    public static final Set<UUID> INFECTED_PLAYERS = ConcurrentHashMap.newKeySet();
+    private static final String STATE_INFECTED = "infected";
 
     private final Random random = new Random();
 
@@ -75,13 +74,19 @@ public class PlagueDisaster implements Disaster {
         int poisonDurationTicks = (int) (Math.max(0, section.getLong("poison-duration-seconds", 3)) * 20L);
         String infectedMessage = section.getString("infected-message", "&2&l기침이 심해집니다... 역병에 감염되었습니다.");
 
+        // 감염자 목록은 이 트리거 전용 state에 담는다. static/인스턴스 필드에 담으면 같은 재앙이 여러 월드에서
+        // 동시에 돌거나 겹쳐 발동할 때 감염자 목록이 전역으로 섞여서, 한쪽이 끝날 때 다른 쪽 감염자까지
+        // 같이 지워버리게 된다.
+        Set<UUID> infected = new HashSet<>();
+        context.putState(STATE_INFECTED, infected);
+
         List<Player> shuffled = new ArrayList<>(players);
         Collections.shuffle(shuffled, random);
         int initialCount = Math.min(shuffled.size(),
                 minInitial + (maxInitial > minInitial ? random.nextInt(maxInitial - minInitial + 1) : 0));
 
         for (int i = 0; i < initialCount; i++) {
-            infectPlayer(shuffled.get(i), infectedMessage);
+            infectPlayer(infected, shuffled.get(i), infectedMessage);
         }
 
         context.track(new BukkitRunnable() {
@@ -91,33 +96,26 @@ public class PlagueDisaster implements Disaster {
             public void run() {
                 elapsed += checkIntervalTicks;
 
-                for (UUID id : new ArrayList<>(INFECTED_PLAYERS)) {
+                for (UUID id : new ArrayList<>(infected)) {
                     Player carrier = Bukkit.getPlayer(id);
                     if (carrier == null || !carrier.isOnline() || !PlayerFilter.isTargetable(carrier)) {
                         continue;
                     }
                     applySymptoms(carrier, symptomDurationTicks, slownessAmplifier, weaknessAmplifier,
                             poisonDurationTicks, poisonAmplifier);
-                    spreadToNearbyPlayers(world, carrier, contagionRadius, infectionChancePercent, infectedMessage);
+                    spreadToNearbyPlayers(infected, world, carrier, contagionRadius, infectionChancePercent, infectedMessage);
                 }
 
                 if (elapsed >= durationTicks) {
                     cancel();
-                    INFECTED_PLAYERS.clear();
                 }
             }
         }.runTaskTimer(plugin, checkIntervalTicks, checkIntervalTicks));
     }
 
-    /** /apoc stop으로 강제 중단됐을 때, 자기 자신의 마지막 틱에서만 정리하던 감염 목록을 즉시 비운다. */
-    @Override
-    public void onStop(DisasterContext context) {
-        INFECTED_PLAYERS.clear();
-    }
-
     /** 플레이어를 감염 목록에 추가하고 감염 메시지를 보낸다. */
-    private void infectPlayer(Player player, String infectedMessage) {
-        INFECTED_PLAYERS.add(player.getUniqueId());
+    private void infectPlayer(Set<UUID> infected, Player player, String infectedMessage) {
+        infected.add(player.getUniqueId());
         player.sendMessage(ColorUtil.parse(infectedMessage));
     }
 
@@ -132,12 +130,12 @@ public class PlagueDisaster implements Disaster {
     }
 
     /** 감염자 주변 반경 안의 아직 감염되지 않은 플레이어에게 확률적으로 전염시킨다. */
-    private void spreadToNearbyPlayers(World world, Player carrier, double radius, int chancePercent, String infectedMessage) {
+    private void spreadToNearbyPlayers(Set<UUID> infected, World world, Player carrier, double radius, int chancePercent, String infectedMessage) {
         for (Player nearby : world.getPlayers()) {
             if (!PlayerFilter.isTargetable(nearby)) {
                 continue;
             }
-            if (INFECTED_PLAYERS.contains(nearby.getUniqueId())) {
+            if (infected.contains(nearby.getUniqueId())) {
                 continue;
             }
             if (nearby.getLocation().distance(carrier.getLocation()) > radius) {
@@ -146,7 +144,7 @@ public class PlagueDisaster implements Disaster {
             if (random.nextInt(100) >= chancePercent) {
                 continue;
             }
-            infectPlayer(nearby, infectedMessage);
+            infectPlayer(infected, nearby, infectedMessage);
             nearby.playSound(nearby.getLocation(), Sound.ENTITY_VILLAGER_HURT, 1.0f, 0.7f);
         }
     }

@@ -13,6 +13,9 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 /**
  * 지속 시간 동안 비를 내리게 하고, 그 비를 맞고 있는(하늘이 뚫린 곳에 있는) 플레이어에게
  * 주기적으로 시듦(Wither) 효과를 걸어 지속 데미지를 준다. 지붕 밑으로 피하면 효과가 더 이상
@@ -33,6 +36,12 @@ public class AcidRainDisaster implements Disaster {
     @Override
     public DangerLevel getDangerLevel() {
         return DangerLevel.LEVEL_2;
+    }
+
+    /** 비를 바닐라 날씨 API(setStorm)로 구현하고 시듦 판정도 world.hasStorm()에 의존하는데, 네더/엔드는 날씨를 지원하지 않는다. */
+    @Override
+    public Set<World.Environment> getSupportedEnvironments() {
+        return EnumSet.of(World.Environment.NORMAL);
     }
 
     @Override

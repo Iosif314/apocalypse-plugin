@@ -21,8 +21,10 @@ import org.bukkit.util.Vector;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * 지속 시간 동안 월드 날씨를 뇌우로 바꾸고, 주기적으로 플레이어 근처에 낙뢰를 떨어뜨리고 돌풍으로 넉백시킨다.
@@ -51,6 +53,12 @@ public class StormDisaster implements Disaster {
         return DangerLevel.LEVEL_4;
     }
 
+    /** 뇌우/비를 바닐라 날씨 API(setStorm/setThundering)로 구현하는데, 네더/엔드는 바닐라 자체가 날씨를 지원하지 않는다. */
+    @Override
+    public Set<World.Environment> getSupportedEnvironments() {
+        return EnumSet.of(World.Environment.NORMAL);
+    }
+
     @Override
     public void trigger(DisasterContext context) {
         Plugin plugin = context.plugin();
@@ -72,7 +80,9 @@ public class StormDisaster implements Disaster {
         float windSoundVolume = (float) Math.max(0, section.getDouble("wind-sound-volume", 1.0));
         float windSoundPitch = (float) section.getDouble("wind-sound-pitch", 0.6);
 
-        int tornadoCount = Math.max(0, section.getInt("tornado-count", 2));
+        // config.yml의 실제 값(1)과 어긋나지 않도록 기본값도 1로 맞춘다 — config 항목이 지워져도 의도와 다르게
+        // 토네이도 2개가 소환되는 일이 없게 하기 위함.
+        int tornadoCount = Math.max(0, section.getInt("tornado-count", 1));
         double tornadoSpawnOffsetRadius = Math.max(0, section.getDouble("tornado-spawn-offset-radius", 75));
         long tornadoTickInterval = Math.max(1, section.getLong("tornado-tick-interval", 2));
         double tornadoDriftSpeed = section.getDouble("tornado-drift-speed", 0.75);
@@ -388,7 +398,11 @@ public class StormDisaster implements Disaster {
         return loc.getY() > highestY;
     }
 
-    /** 반경 안 엔티티/플레이어를 중심으로 끌어당기면서 원형으로 돌리고, 일정 높이까지 띄워 올린다. */
+    /**
+     * 반경 안 엔티티/플레이어를 중심으로 끌어당기면서 원형으로 돌리고, 일정 높이까지 띄워 올린다.
+     * 몹/동물도 플레이어와 동일하게 흡입 대상이다(의도된 동작) — 실제 토네이도처럼 반경 안의 모든 생명체를
+     * 무차별로 휩쓸어야 재난다운 규모감이 살고, 몹만 예외로 두면 오히려 부자연스럽다.
+     */
     private void applyVortexForces(World world, Location center, double pullRadius, double pullStrength,
                                     double spinStrength, double liftStrength, double maxLiftHeight) {
         double groundY = center.getY();
