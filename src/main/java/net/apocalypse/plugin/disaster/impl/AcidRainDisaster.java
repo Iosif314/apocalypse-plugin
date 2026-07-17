@@ -203,7 +203,8 @@ public class AcidRainDisaster implements Disaster {
             return;
         }
         if (block.getBlockData() instanceof Ageable ageable) {
-            if (ageable.getAge() > ageable.getMinimumAge()) {
+            // Ageable의 나이는 항상 0부터 시작한다(별도의 "최소 나이" API는 없음).
+            if (ageable.getAge() > 0) {
                 ageable.setAge(ageable.getAge() - 1);
                 block.setBlockData(ageable, false);
             } else {
