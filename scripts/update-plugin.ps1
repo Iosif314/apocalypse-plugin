@@ -1,4 +1,6 @@
-# GitHub 릴리스("latest" 태그)에서 최신 Apocalypse.jar를 받아와 이 컴퓨터의 서버 plugins 폴더에 반영한다.
+# GitHub 릴리스("latest" 태그)에서 최신 Apocalypse jar(예: Apocalypse-1.0.1.jar)를 받아와
+# 이 컴퓨터의 서버 plugins 폴더에 반영한다. 배포 파일명에 버전이 그대로 붙으므로, 새 버전을 넣을 때
+# 예전 버전 jar는 자동으로 정리한다.
 # 이미 받은 버전(jar 에셋 id)과 같으면 아무 작업도 하지 않는다.
 # 서버가 켜져 있고 RCON이 활성화돼 있으면 plugman으로 안전하게 언로드 -> 교체 -> 로드한다.
 #
@@ -11,7 +13,6 @@ $RepoOwner = "Iosif314"
 $RepoName = "apocalypse-plugin"
 $ServerDir = "C:\apocalypes"
 $PluginsDir = Join-Path $ServerDir "plugins"
-$JarName = "Apocalypse.jar"
 $MarkerFile = Join-Path $PSScriptRoot ".last-release-id"
 $LogFile = Join-Path $PSScriptRoot "update-plugin.log"
 
@@ -144,9 +145,19 @@ try {
         }
     }
 
+    # 릴리스에 올라온 jar 파일명(예: Apocalypse-1.0.1.jar) 그대로 배포해서, plugins 폴더만 봐도
+    # 지금 어떤 버전이 떠 있는지 알 수 있게 한다.
+    $JarName = $asset.name
     New-Item -ItemType Directory -Force -Path $PluginsDir | Out-Null
     Copy-Item -Path $tempJar -Destination (Join-Path $PluginsDir $JarName) -Force
     Write-Log "$JarName 교체 완료 ($PluginsDir)"
+
+    # 버전마다 파일명이 달라지므로, 예전 버전 jar를 남겨두면 플러그인 이름 중복으로 서버가 로드에 실패한다.
+    # 방금 배포한 파일을 제외한 나머지 Apocalypse*.jar를 정리한다. (버전 붙기 전의 옛 고정 이름 Apocalypse.jar도 포함)
+    Get-ChildItem -Path $PluginsDir -Filter "Apocalypse*.jar" | Where-Object { $_.Name -ne $JarName } | ForEach-Object {
+        Remove-Item -Path $_.FullName -Force
+        Write-Log "구버전 정리: $($_.Name)"
+    }
 
     if ($serverRunning -and $rconEnabled) {
         try {

@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "net.apocalypse"
-version = "1.0.0"
+version = "1.10.9"
 
 java {
     toolchain {
@@ -57,7 +57,7 @@ tasks {
 
 val pluginsDir = File("C:/Users/USER/Documents/Plugin Test/plugins")
 val serverDir  = File("C:/Users/USER/Documents/Plugin Test")
-val fixedJarName = "Apocalypse.jar"
+val fixedJarName = "Apocalypse-${project.version}.jar"
 
 fun isServerRunning(): Boolean = try {
     Socket("localhost", 25565).use { true }
@@ -164,7 +164,7 @@ tasks.register("deleteOldPlugin") {
         pluginsDir.listFiles { f -> f.name.endsWith(".jar.bak") }?.forEach { f ->
             if (f.delete()) println("[deleteOldPlugin] .bak 정리: ${f.name}")
         }
-        // 고정 이름 외의 구버전 jar 삭제
+        // 이번에 배포한 버전(fixedJarName) 외의 구버전 jar 삭제
         val targets = pluginsDir.listFiles { f ->
             f.name.startsWith("Apocalypse") && f.name.endsWith(".jar") && f.name != fixedJarName
         } ?: emptyArray()
