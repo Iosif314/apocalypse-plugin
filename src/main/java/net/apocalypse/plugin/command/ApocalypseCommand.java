@@ -40,7 +40,7 @@ public class ApocalypseCommand implements CommandExecutor, TabCompleter {
             case "toggle" -> handleToggle(sender, args);
             case "reload" -> handleReload(sender);
             case "list" -> handleList(sender);
-            case "stop" -> handleStop(sender);
+            case "stop" -> handleStop(sender, args);
             case "update-note" -> handleUpdateNote(sender);
             default -> sendUsage(sender, label);
         }
@@ -97,7 +97,23 @@ public class ApocalypseCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    private void handleStop(CommandSender sender) {
+    private void handleStop(CommandSender sender, String[] args) {
+        if (args.length >= 2) {
+            String id = args[1].toLowerCase();
+            Disaster disaster = disasterManager.getDisasters().get(id);
+            if (disaster == null) {
+                sender.sendMessage(ColorUtil.parse("&c알 수 없는 재앙 id입니다: " + id + " (/apocalypse list 로 확인하세요)"));
+                return;
+            }
+            int stopped = disasterManager.stopDisaster(id);
+            if (stopped > 0) {
+                sender.sendMessage(ColorUtil.parse("&a" + disaster.getDisplayName() + " 재앙을 멈췄습니다."));
+            } else {
+                sender.sendMessage(ColorUtil.parse("&e지금 진행 중이거나 대기 중인 " + disaster.getDisplayName() + " 재앙이 없습니다."));
+            }
+            return;
+        }
+
         int stopped = disasterManager.stopCurrent();
         if (stopped > 0) {
             sender.sendMessage(ColorUtil.parse("&a진행 중이거나 대기 중이던 재앙을 멈췄습니다."));
@@ -133,7 +149,8 @@ public class ApocalypseCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ColorUtil.parse("&6/" + label + " toggle [종류] &7- 특정 재앙만 자동 발생을 켜거나 끕니다. (저장됨)"));
         sender.sendMessage(ColorUtil.parse("&6/" + label + " reload &7- 설정을 다시 불러옵니다."));
         sender.sendMessage(ColorUtil.parse("&6/" + label + " list &7- 사용 가능한 재앙 종류를 확인합니다."));
-        sender.sendMessage(ColorUtil.parse("&6/" + label + " stop &7- 진행 중이거나 대기 중인 재앙을 멈춥니다."));
+        sender.sendMessage(ColorUtil.parse("&6/" + label + " stop &7- 진행 중이거나 대기 중인 재앙을 전부 멈춥니다."));
+        sender.sendMessage(ColorUtil.parse("&6/" + label + " stop [종류] &7- 특정 재앙만 멈춥니다."));
         sender.sendMessage(ColorUtil.parse("&6/" + label + " update-note &7- GitHub 저장소의 가장 최근 커밋 정보를 보여줍니다."));
     }
 
@@ -154,7 +171,8 @@ public class ApocalypseCommand implements CommandExecutor, TabCompleter {
             String prefix = args[0].toLowerCase();
             return SUBCOMMANDS.stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
         }
-        if (args.length == 2 && (args[0].equalsIgnoreCase("trigger") || args[0].equalsIgnoreCase("toggle"))) {
+        if (args.length == 2 && (args[0].equalsIgnoreCase("trigger") || args[0].equalsIgnoreCase("toggle")
+                || args[0].equalsIgnoreCase("stop"))) {
             String prefix = args[1].toLowerCase();
             return disasterManager.getDisasters().keySet().stream()
                     .filter(id -> id.startsWith(prefix))

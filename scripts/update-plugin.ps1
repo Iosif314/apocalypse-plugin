@@ -9,7 +9,7 @@
 
 $RepoOwner = "Iosif314"
 $RepoName = "apocalypse-plugin"
-$ServerDir = "C:\Users\USER\Documents\Plugin Test"
+$ServerDir = "C:\apocalypes"
 $PluginsDir = Join-Path $ServerDir "plugins"
 $JarName = "Apocalypse.jar"
 $MarkerFile = Join-Path $PSScriptRoot ".last-release-id"

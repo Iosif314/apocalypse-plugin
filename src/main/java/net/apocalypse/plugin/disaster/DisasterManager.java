@@ -13,6 +13,7 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,8 +35,12 @@ public class DisasterManager {
     private final Map<String, BukkitTask> scheduledTasks = new HashMap<>();
 
     // /apoc stop이 취소할 수 있도록, 아직 발동 전인(경고 대기 중인) 예약과 이미 발동해서 진행 중인 재앙들을 추적한다.
-    private final List<BukkitTask> pendingWarningTasks = new ArrayList<>();
+    // 특정 재앙 id만 골라서 멈출 수 있어야 하므로, 어떤 Disaster에 속하는 작업인지도 같이 기억해둔다.
+    private final List<PendingRun> pendingRuns = new ArrayList<>();
     private final List<ActiveRun> activeRuns = new ArrayList<>();
+
+    private record PendingRun(Disaster disaster, BukkitTask task) {
+    }
 
     private record ActiveRun(Disaster disaster, DisasterContext context) {
     }
@@ -236,8 +241,9 @@ public class DisasterManager {
             spawn.run();
         } else {
             int warningSeconds = plugin.getConfig().getInt("settings.warning-seconds", 10);
-            pendingWarningTasks.removeIf(BukkitTask::isCancelled);
-            pendingWarningTasks.add(Bukkit.getScheduler().runTaskLater(plugin, spawn, warningSeconds * 20L));
+            pendingRuns.removeIf(pending -> pending.task().isCancelled());
+            BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, spawn, warningSeconds * 20L);
+            pendingRuns.add(new PendingRun(disaster, task));
         }
     }
 
@@ -254,13 +260,13 @@ public class DisasterManager {
     public int stopCurrent() {
         int stoppedCount = 0;
 
-        for (BukkitTask task : pendingWarningTasks) {
-            if (!task.isCancelled()) {
-                task.cancel();
+        for (PendingRun pending : pendingRuns) {
+            if (!pending.task().isCancelled()) {
+                pending.task().cancel();
                 stoppedCount++;
             }
         }
-        pendingWarningTasks.clear();
+        pendingRuns.clear();
 
         for (ActiveRun run : activeRuns) {
             for (BukkitTask task : run.context().activeTasks()) {
@@ -272,6 +278,46 @@ public class DisasterManager {
             stoppedCount++;
         }
         activeRuns.clear();
+
+        return stoppedCount;
+    }
+
+    /**
+     * id가 일치하는 재앙만 골라서 멈춘다(경고 대기 중이었던 예약 + 이미 진행 중이던 재앙 둘 다 대상).
+     * stopCurrent()와 동일하게 예약된 작업을 취소하고 onStop()으로 영구 상태를 복구한다.
+     * 실제로 멈춘 개수를 반환한다(0이면 그 id로 대기/진행 중인 게 없었다는 뜻).
+     */
+    public int stopDisaster(String id) {
+        int stoppedCount = 0;
+
+        Iterator<PendingRun> pendingIterator = pendingRuns.iterator();
+        while (pendingIterator.hasNext()) {
+            PendingRun pending = pendingIterator.next();
+            if (!pending.disaster().getId().equals(id)) {
+                continue;
+            }
+            if (!pending.task().isCancelled()) {
+                pending.task().cancel();
+                stoppedCount++;
+            }
+            pendingIterator.remove();
+        }
+
+        Iterator<ActiveRun> activeIterator = activeRuns.iterator();
+        while (activeIterator.hasNext()) {
+            ActiveRun run = activeIterator.next();
+            if (!run.disaster().getId().equals(id)) {
+                continue;
+            }
+            for (BukkitTask task : run.context().activeTasks()) {
+                if (!task.isCancelled()) {
+                    task.cancel();
+                }
+            }
+            run.disaster().onStop(run.context());
+            stoppedCount++;
+            activeIterator.remove();
+        }
 
         return stoppedCount;
     }
