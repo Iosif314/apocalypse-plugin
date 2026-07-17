@@ -1,0 +1,23 @@
+name: Apocalypse
+version: '${version}'
+main: net.apocalypse.plugin.ApocalypsePlugin
+api-version: '1.21'
+author: Iosif314
+description: 서버에 랜덤 재앙 이벤트를 발생시키는 아포칼립스 플러그인
+
+commands:
+  apocalypse:
+    description: 아포칼립스 플러그인 관리 명령어
+    aliases: [apoc, disaster]
+    permission: apocalypse.admin
+    usage: |
+      /<command> trigger [종류] - 재앙을 즉시 발생시킵니다.
+      /<command> toggle - 전체 재앙 자동 발생을 켜거나 끕니다. (저장됨)
+      /<command> toggle [종류] - 특정 재앙만 자동 발생을 켜거나 끕니다. (저장됨)
+      /<command> reload - 설정을 다시 불러옵니다.
+      /<command> list - 사용 가능한 재앙 종류를 확인합니다.
+
+permissions:
+  apocalypse.admin:
+    description: 아포칼립스 플러그인 관리 명령어 사용 권한
+    default: op

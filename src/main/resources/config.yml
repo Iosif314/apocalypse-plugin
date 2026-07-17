@@ -1,0 +1,362 @@
+# Apocalypse 플러그인 설정
+
+settings:
+  # 랜덤 재앙 이벤트를 자동으로 발생시킬지 여부
+  enabled: true
+  # 재앙이 발생할 대상 월드 목록
+  worlds:
+    - world
+  # 재앙 발생 전 경고 메시지를 띄우고 실제로 발생하기(=운석이 하늘에 생성되기)까지 대기하는 시간(초)
+  warning-seconds: 60
+
+# 재앙 종류별 설정. id를 키로 사용하며, 새 재앙을 추가할 때 이 밑에 섹션만 추가하면 됩니다.
+disasters:
+  meteor-strike:
+    enabled: true
+    # /apocalypse trigger 처럼 종류를 지정하지 않고 무작위로 하나 고를 때의 가중치. 값이 클수록 더 자주 선택됩니다.
+    weight: 10
+    # 이 재앙 자신의 자동 발생 쿨타임(초) 범위. 재앙마다 독립적으로 이 범위 안에서 무작위로 다음 발생 시각이 정해집니다.
+    # 아래 두 줄과 auto-trigger-chance를 생략하면 위험도(현재 5단계)의 기본값을 대신 씁니다.
+    min-interval-seconds: 600
+    max-interval-seconds: 1200
+    # 쿨타임이 돌 때 실제로 발동할 확률(%). 생략하면 위험도 기본값(5단계 = 48%)을 씁니다.
+    # 즉 이 운석은 10~20분마다 48% 확률로 시도되므로 평균적으로는 그보다 뜸하게 실제로 떨어집니다.
+    # auto-trigger-chance: 20
+
+    # 운석이 생성되는 고정 y좌표
+    spawn-height: 300
+    # 생성 위치의 x/z가 타겟 플레이어의 x/z로부터 벗어나는 최대 범위(블록). 이 범위 안에서 무작위로 정해집니다.
+    spawn-offset-radius: 100
+    # 낙하 속도 (틱당 이동 블록 수). 클수록 더 빨리 떨어집니다.
+    travel-speed: 1.0
+    # 운석 비주얼(블록 디스플레이 클럼프)의 대략적인 직경(블록). 이 범위 안에 들어온 엔티티는 직격으로 취급됩니다.
+    visual-diameter: 10.0
+
+    # 폭발(파괴) 구체의 직경(블록)
+    crater-diameter: 175
+    # 파괴된 구체 바로 바깥쪽 한 겹을 네더랙으로 채울지 여부
+    netherrack-shell: true
+    # 지형 파괴/네더랙 처리를 한 틱에 몇 셀씩 나눠서 처리할지. 너무 크면 랙, 너무 작으면 크레이터가 완성되기까지 오래 걸림.
+    excavation-cells-per-tick: 800000
+
+    # 착탄 시 재생되는 폭발음 (바닐라 폭발음을 낮은 피치로 재생). pitch는 0.5~2.0 범위.
+    impact-sound-volume: 8.0
+    impact-sound-pitch: 0.5
+
+    # 운석에 직접 맞은(직격) 엔티티에게 들어가는 고정 데미지
+    direct-hit-damage: 1500.0
+    # 직격되지 않은 엔티티가 받는 범위 데미지 범위. 착탄 지점 기준 거리 0에서 splash-damage-max,
+    # crater-diameter/2 거리에서 splash-damage-min이 되도록 선형으로 감소합니다.
+    splash-damage-max: 750.0
+    splash-damage-min: 250.0
+
+    # 튀어나오는 광석 블록 개수 범위
+    ore-count:
+      min: 10
+      max: 200
+    # 광석 블록(폴링 블록)이 튕겨나가는 속도 범위 (블록/틱). 방향은 매번 무작위(위쪽으로 30~80도 편향).
+    ore-launch-speed:
+      min: 3.0
+      max: 8.0
+    # 튀어나올 수 있는 광석 블록 종류
+    ore-blocks:
+      - COAL_ORE
+      - DEEPSLATE_COAL_ORE
+      - IRON_ORE
+      - DEEPSLATE_IRON_ORE
+      - COPPER_ORE
+      - DEEPSLATE_COPPER_ORE
+      - GOLD_ORE
+      - DEEPSLATE_GOLD_ORE
+      - REDSTONE_ORE
+      - DEEPSLATE_REDSTONE_ORE
+      - LAPIS_ORE
+      - DEEPSLATE_LAPIS_ORE
+      - DIAMOND_ORE
+      - DEEPSLATE_DIAMOND_ORE
+      - EMERALD_ORE
+      - DEEPSLATE_EMERALD_ORE
+      - ANCIENT_DEBRIS
+
+    # 운석이 생성되기(=하늘에 나타나기) settings.warning-seconds초 전에 전체 채팅으로 발송되는 경고
+    warning-message: "&c&l하늘에서 불길한 기운이 느껴집니다... 곧 운석이 떨어집니다!"
+    # 운석이 생성되는 순간(하늘에 나타나는 순간) 전체 채팅으로 발송되는 메시지
+    appear-message: "&4&l하늘에서 거대한 운석이 모습을 드러냈습니다!"
+    # 운석의 낙하 높이가 생성 지점과 착탄 지점의 중간을 지날 때 전체 채팅으로 발송되는 메시지. %player%는 타겟 플레이어 이름으로 치환됩니다.
+    target-reveal-message: "&c&l경고! %player%님을 향해 운석이 낙하하고 있습니다!"
+
+  solar-extinction:
+    enabled: true
+    # /apocalypse trigger 처럼 종류를 지정하지 않고 무작위로 하나 고를 때의 가중치.
+    weight: 9
+    # 자동 발생 쿨타임/확률은 min-interval-seconds 등을 따로 안 정해뒀으면 위험도(현재 1단계 = 5~10분, 100%) 기본값을 씁니다.
+
+    # 태양이 사라져(밤으로 고정) 있는 시간(초)
+    duration-seconds: 90
+    # 어둠(Darkness) 효과를 다시 걸어주는 주기(틱, 20틱 = 1초)
+    darkness-interval-ticks: 60
+    # 어둠 효과 한 번 걸릴 때 유지되는 시간(초)
+    darkness-duration-seconds: 5
+
+    warning-message: "&c&l하늘이 빛을 잃어가기 시작합니다... 곧 태양이 사라집니다!"
+    appear-message: "&4&l태양이 완전히 사라졌습니다!"
+
+  zombie-outbreak:
+    enabled: true
+    # /apocalypse trigger 처럼 종류를 지정하지 않고 무작위로 하나 고를 때의 가중치.
+    weight: 8
+    # 자동 발생 쿨타임/확률은 min-interval-seconds 등을 따로 안 정해뒀으면 위험도(현재 2단계 = 10~20분, 84%) 기본값을 씁니다.
+
+    # 재앙이 지속되는 시간(초). 좀비는 발동 시점에 한 번만 소환되고, 이 시간 동안은 위장 판정만 계속 돕니다.
+    duration-seconds: 120
+    # 발동 시점에 플레이어 한 명당 한 번에 소환되는 좀비 수 범위
+    zombie-count:
+      min: 5
+      max: 10
+    # 플레이어 주변 좀비가 소환될 수 있는 반경(블록)
+    spawn-radius: 12
+
+    # 이 거리(블록) 안에 다른 플레이어가 있으면 서로에게(그리고 모두에게) 좀비로 위장됩니다.
+    group-radius: 8
+    # 위장 상태(누가 누구와 모여있는지)를 다시 계산하는 주기(틱). 너무 크면 좀비 인형이 플레이어를 못 따라가고 뚝뚝 끊겨 보입니다.
+    disguise-check-interval-ticks: 4
+    # 위장 중인 플레이어에게 걸리는 이동속도 감소 효과 세기 (0=I단계, 값이 클수록 더 느려짐)
+    disguise-slowness-amplifier: 2
+    # 위장 중인 플레이어의 jump_strength 속성값(기본 0.42)에서 이만큼을 빼서 평소엔 점프를 아예 못 하게 막습니다.
+    # 대신 벽(블록 한 칸 턱)에 막혀 못 움직이면 감지해서 강제로 한 번 점프시켜 턱을 넘어가게 해줍니다.
+    disguise-jump-strength-reduction: 0.5
+
+    warning-message: "&c&l썩은 냄새가 진동하기 시작합니다... 곧 좀비들이 몰려옵니다!"
+    appear-message: "&4&l좀비가 창궐하기 시작했습니다! 사람들 사이에 무언가 섞여 있습니다..."
+
+  storm:
+    enabled: true
+    # /apocalypse trigger 처럼 종류를 지정하지 않고 무작위로 하나 고를 때의 가중치.
+    weight: 9
+    # 자동 발생 쿨타임/확률은 min-interval-seconds 등을 따로 안 정해뒀으면 위험도(현재 4단계 = 14~24분, 51%) 기본값을 씁니다.
+
+    # 폭풍우가 시작되고 이만큼 지난 뒤에야 토네이도(회오리)가 생성됩니다. 그 전까지는 뇌우/낙뢰/돌풍만 발생합니다.
+    tornado-delay-seconds: 60
+    # 토네이도가 생성된 뒤 유지되는 시간(초). 폭풍우 전체 지속시간은 tornado-delay-seconds + duration-seconds입니다.
+    # (이 시간 동안 월드 날씨가 뇌우로 유지되고 낙뢰/돌풍도 계속됩니다)
+    duration-seconds: 60
+
+    # 낙뢰 시도 주기(틱, 20틱 = 1초)
+    lightning-interval-ticks: 60
+    # 낙뢰 시도마다 각 플레이어에게 실제로 낙뢰가 떨어질 확률(%)
+    lightning-chance: 35
+    # 낙뢰가 플레이어 기준 떨어질 수 있는 반경(블록). 작을수록 직격당할 확률이 높아집니다.
+    lightning-radius: 6
+
+    # 돌풍이 부는 주기(틱)
+    wind-interval-ticks: 100
+    # 돌풍 세기. 클수록 더 세게 밀려납니다.
+    wind-force: 1.4
+    # 돌풍이 불 때마다, 지상(하늘이 뚫린 곳)에 있는 플레이어에게 들려주는 칼바람 소리의 크기/피치
+    wind-sound-volume: 1.0
+    wind-sound-pitch: 0.6
+
+    # 동시에 발생하는 회오리(토네이도) 개수. 각각 무작위 플레이어(타겟)의 x/z ± tornado-spawn-offset-radius 위치에서 시작해 지형 위를 서서히 떠돕니다.
+    tornado-count: 2
+    # 회오리 생성 위치가 타겟 플레이어의 x/z 좌표로부터 벗어나는 최대 범위(블록). 이 범위 안에서 무작위로 정해집니다.
+    tornado-spawn-offset-radius: 75
+    # 회오리의 이동/파티클/엔티티 흡입이 갱신되는 주기(틱). 작을수록 더 부드럽게 움직이지만 서버 부하가 커집니다.
+    tornado-tick-interval: 2
+    # 회오리 중심이 이동하는 속도(갱신당 블록). 작을수록 한 자리에 오래 머무릅니다.
+    tornado-drift-speed: 0.75
+    # 이 반경(블록) 안에 있는 엔티티/플레이어가 회오리에 휘말립니다.
+    tornado-pull-radius: 75
+    # 중심으로 끌어당기는 힘
+    tornado-pull-strength: 0.1
+    # 원형으로 돌리는 힘. 클수록 더 빠르게 빙글빙글 돕니다.
+    tornado-spin-strength: 0.5
+    # 위로 띄워 올리는 힘
+    tornado-lift-strength: 0.35
+    # 회오리 지면 기준 이 높이(블록) 이상으로는 더 안 띄웁니다(그 이상은 중력+회전만 작용)
+    tornado-max-lift-height: 150
+    # 블록을 부수는 반경(블록)
+    tornado-destruction-radius: 75
+    # 블록을 부수는 높이(지면 기준, 블록)
+    tornado-destruction-height: 200
+    # 반경 안 각 블록이 파괴 시도마다 실제로 부서질 확률(0.0~1.0)
+    tornado-destruction-chance: 0.5
+    # 부서진 블록 중 회오리를 타고 떠오르는 잔해(폴링 블록)로 남을 확률(0.0~1.0)
+    tornado-debris-chance: 0.3
+    # 파괴 범위 전체(반경75 x 높이200 ≈ 450만 셀)를 한 틱에 다 처리하면 랙이 나므로,
+    # 운석 크레이터처럼 한 틱에 이 개수만큼만 처리하고 다음 틱에 이어서 계속합니다.
+    tornado-destruction-cells-per-tick: 50000
+    # 소용돌이 파티클 기둥의 높이(블록). 파괴 높이와 별개로, 눈에 보이는 회오리 모양을 위한 값입니다.
+    tornado-visual-height: 200
+
+    warning-message: "&c&l먹구름이 몰려오며 하늘이 어두워집니다... 곧 폭풍우가 몰아칩니다!"
+    appear-message: "&4&l폭풍우가 몰아치기 시작했습니다!"
+
+  acid-rain:
+    enabled: true
+    # /apocalypse trigger 처럼 종류를 지정하지 않고 무작위로 하나 고를 때의 가중치.
+    weight: 9
+    # 자동 발생 쿨타임/확률은 min-interval-seconds 등을 따로 안 정해뒀으면 위험도(현재 2단계 = 10~20분, 84%) 기본값을 씁니다.
+
+    # 비가 내리는 시간(초)
+    duration-seconds: 120
+    # 비에 노출됐는지(머리 위에 지붕이 없는지) 다시 판정하는 주기(틱, 20틱 = 1초)
+    rain-check-interval-ticks: 20
+    # 비에 노출된 플레이어에게 걸리는 시듦(Wither) 효과 세기 (0=I단계, 4=V단계, 값이 클수록 더 아픔)
+    wither-amplifier: 4
+    # 효과 한 번 걸릴 때 유지되는 시간(초)
+    wither-duration-seconds: 5
+
+    warning-message: "&c&l하늘이 누렇게 물들며 매캐한 냄새가 퍼집니다... 곧 산성비가 내립니다!"
+    appear-message: "&4&l산성비가 내리기 시작했습니다!"
+
+  plague:
+    enabled: true
+    # /apocalypse trigger 처럼 종류를 지정하지 않고 무작위로 하나 고를 때의 가중치.
+    weight: 8
+    # 자동 발생 쿨타임/확률은 min-interval-seconds 등을 따로 안 정해뒀으면 위험도(현재 2단계 = 10~20분, 84%) 기본값을 씁니다.
+
+    # 역병이 지속되는 시간(초)
+    duration-seconds: 180
+    # 증세 갱신/전염 시도를 하는 주기(틱, 20틱 = 1초)
+    infection-check-interval-ticks: 40
+    # 발동 시점에 무작위로 처음부터 감염되어 있는 플레이어 수 범위
+    initial-infected-count:
+      min: 1
+      max: 1
+    # 감염자 기준 이 반경(블록) 안에 있는 미감염 플레이어에게 매 판정마다 전염을 시도합니다.
+    contagion-radius: 6
+    # 반경 안에 있을 때 실제로 전염될 확률(%)
+    infection-chance-percent: 40
+
+    # 감염자에게 걸리는 구속/쇠약 효과 유지 시간(초). 매 판정 주기마다 갱신되어, 감염 상태인 동안 계속 겪습니다.
+    symptom-duration-seconds: 6
+    # 감염자에게 걸리는 구속(느려짐) 효과 세기 (0=I단계, 값이 클수록 더 느려짐)
+    slowness-amplifier: 1
+    # 감염자에게 걸리는 쇠약 효과 세기 (0=I단계, 값이 클수록 공격력이 더 약해짐)
+    weakness-amplifier: 1
+    # 감염자에게 걸리는 중독 효과 세기 / 유지 시간(초). 0으로 두면 중독은 걸지 않습니다.
+    poison-amplifier: 0
+    poison-duration-seconds: 3
+
+    # 새로 감염된 플레이어(처음 감염자 포함)에게 뜨는 개인 메시지
+    infected-message: "&2&l기침이 심해집니다... 역병에 감염되었습니다."
+
+    warning-message: "&c&l퀴퀴한 냄새와 함께 불길한 기운이 감돕니다... 곧 역병이 퍼집니다!"
+    appear-message: "&4&l역병이 퍼지기 시작했습니다!"
+
+  blizzard:
+    enabled: true
+    # /apocalypse trigger 처럼 종류를 지정하지 않고 무작위로 하나 고를 때의 가중치.
+    weight: 9
+    # 자동 발생 쿨타임/확률은 min-interval-seconds 등을 따로 안 정해뒀으면 위험도(현재 2단계 = 10~20분, 84%) 기본값을 씁니다.
+
+    # 한파가 지속되는 시간(초)
+    duration-seconds: 120
+    # 눈 파티클 갱신 / 동상 판정을 하는 주기(틱, 20틱 = 1초)
+    check-interval-ticks: 20
+    # 눈 쌓임/얼음 얼리기처럼 넓은 반경을 훑는 무거운 지형 작업을 실행하는 주기(틱, 100틱 = 5초).
+    # 반경(snow-accumulation-radius, ice-freeze-radius)이 커서 매 판정(check-interval-ticks)마다 돌리면 부하가 크므로 더 뜸하게 돕니다.
+    block-effect-interval-ticks: 40
+
+    # 플레이어 머리 위에 뿌리는 눈 파티클 개수. 바이옴 온도(=고도)와 무관하게 항상 눈이 오는 것처럼 보이게 합니다.
+    snow-particle-count: 40
+    # 눈 파티클이 흩뿌려지는 반경(블록)
+    snow-particle-radius: 5
+
+    # 열원 근처가 아닌 플레이어에게 걸리는 동상 구속(느려짐) 효과 세기 (0=I단계, 값이 클수록 더 느려짐)
+    frostbite-slowness-amplifier: 1
+    # 판정 주기마다 열원 근처가 아닌 플레이어가 입는 동상 데미지
+    frostbite-damage: 1.0
+    # 하늘이 뚫려 있으면서 열원 근처도 아닌 플레이어 기준 이 반경(블록) 안의 단단한 지형 위에 실제로 눈을 쌓습니다.
+    snow-accumulation-radius: 256
+    # 눈 블록 한 칸이 쌓을 수 있는 최대 층수 (1~8, 마인크래프트 시스템상 한계도 8입니다). 판정 주기마다 한 층씩 늘어나고,
+    # 다 차면 그 위에 새 눈 블록이 쌓입니다.
+    snow-max-layers: 8
+    # 횃불/모닥불(꺼진 것 제외)/랜턴(영혼 포함)이 이 반경(블록, 3차원) 안에 있으면 동상 피해와 눈 쌓임에서 면제됩니다.
+    heat-source-radius: 12
+    # 무거운 지형 작업 주기(block-effect-interval-ticks)마다, 지상(하늘이 뚫린 곳)에 있는 플레이어에게 들려주는 칼바람 소리의 크기/피치
+    wind-sound-volume: 1.0
+    wind-sound-pitch: 0.6
+    # 하늘이 뚫린 곳에 있는 플레이어 기준 이 반경(블록) 안의 지표수를 얼음으로 바꿉니다. 열원과는 무관합니다.
+    ice-freeze-radius: 256
+
+    warning-message: "&c&l공기가 급격히 차가워지며 살을 에는 듯한 한기가 느껴집니다... 곧 한파가 몰아칩니다!"
+    appear-message: "&4&l한파가 몰아치기 시작했습니다!"
+
+  dimensional-annihilation:
+    enabled: true
+    # /apocalypse trigger 처럼 종류를 지정하지 않고 무작위로 하나 고를 때의 가중치. 다른 재앙들보다 훨씬 낮게 잡았습니다.
+    weight: 2
+    # 자동 발생 쿨타임/확률은 min-interval-seconds 등을 따로 안 정해뒀으면 위험도(현재 6단계 = 2~4시간, 8%) 기본값을 씁니다.
+
+    # 소멸되는 청크 안에 있던 플레이어에게 들어가는 고정 데미지 (사실상 즉사)
+    player-damage: 10000.0
+    # 타겟(과 그 청크 좌표)이 정해진 뒤 실제로 소멸이 일어나기까지 대기하는 시간(초)
+    annihilation-delay-seconds: 60
+
+    # 재앙이 발동하기 settings.warning-seconds초 전에 전체 채팅으로 발송되는 경고
+    warning-message: "&c&l공간이 일그러지며 균열이 번지기 시작합니다... 곧 차원이 소멸합니다!"
+    # 재앙이 실제로 발동해 타겟(과 그 청크)이 정해지는 순간 전체 채팅으로 발송되는 메시지
+    appear-message: "&4&l어느 차원에서의 간섭이 느껴집니다..."
+    # annihilation-delay-seconds가 지나 실제로 청크가 소멸하는 순간 전체 채팅으로 발송되는 메시지
+    annihilation-message: "&4&l차원이 완전히 소멸했습니다!"
+
+  sinkhole:
+    enabled: true
+    # /apocalypse trigger 처럼 종류를 지정하지 않고 무작위로 하나 고를 때의 가중치.
+    weight: 9
+    # 자동 발생 쿨타임/확률은 min-interval-seconds 등을 따로 안 정해뒀으면 위험도(현재 3단계 = 12~22분, 75%) 기본값을 씁니다.
+
+    # 타겟 플레이어의 위치가 정해지는 즉시 이 반경(블록) 안에 있는 플레이어들에게만 국지적인 경고가 뜹니다. (전체 채팅 아님)
+    warning-radius: 15
+    # 경고가 뜬 뒤 실제로 구덩이가 무너지기까지 대기하는 시간(초)
+    collapse-delay-seconds: 5
+    # 무너지는 원기둥 구덩이의 반경(블록)
+    sinkhole-radius: 4
+    # 구덩이가 지면에서부터 파고드는 깊이(블록). 인챈트 없는 다이아몬드 풀세트 기준 아슬아슬하게 생존하는 수준으로 실제 테스트를 거쳐 조정된 값입니다.
+    sinkhole-depth: 21
+
+    # 경고 반경 안에 있는 플레이어들에게만 뜨는 국지적인 경고 메시지 (전체 채팅으로 뜨는 warning-message와 별개)
+    local-warning-message: "&c&l발 밑에 미세한 진동이 느껴집니다..."
+
+    # 재앙이 발동하기 settings.warning-seconds초 전에 전체 채팅으로 발송되는 경고
+    warning-message: "&c&l땅속 깊은 곳에서 불길한 진동이 울려 퍼지기 시작합니다... 곧 대지가 무너져 내립니다!"
+    # 타겟 위치가 정해지고 국지적 경고가 뜨는 순간 전체 채팅으로 발송되는 메시지
+    appear-message: "&4&l어딘가의 땅이 위태롭게 흔들리기 시작했습니다..."
+
+  apocalypse:
+    enabled: true
+    # /apocalypse trigger 처럼 종류를 지정하지 않고 무작위로 하나 고를 때의 가중치.
+    weight: 3
+    # 자동 발생 쿨타임/확률은 min-interval-seconds 등을 따로 안 정해뒀으면 위험도(현재 6단계 = 2~4시간, 8%) 기본값을 씁니다.
+    # 여러 재앙을 한 번에 몰아서 터뜨리는 초대형 이벤트라 "차원 소멸"과 같은 최상위 등급으로 격상했습니다.
+
+    # 연속으로 몇 번 재앙이 발생할지 뽑는 범위
+    chain-count:
+      min: 2
+      max: 5
+
+    # 타이틀 연출 타이밍 (틱 단위, 20틱 = 1초)
+    # "종말은 영어로"를 한 글자씩 공개할 때 한 글자당 유지 시간
+    letter-frame-ticks: 4
+    # 글자가 다 공개된 뒤 말줄임표(.)가 한 개씩 붙는 한 번당 유지 시간. letter-frame-ticks보다 느리게(길게) 뜸을 들이는 용도.
+    suspense-frame-ticks: 20
+    # "아포칼립스" 타이틀로 전환된 뒤, 연속 발생 횟수 룰렛이 돌기 시작하기 전까지 유지 시간
+    title-hold-ticks: 30
+    # 연속 발생 횟수 룰렛이 돌아가는(숫자가 바뀌는) 한 프레임당 시간 / 최종 값에 멈추기 전까지 도는 횟수. 프레임끼리는 빈 화면 없이 바로 이어진다.
+    roulette-spin-ticks: 3
+    roulette-spin-count: 12
+    # "연속 N회 재앙 발생" 문구 유지 시간
+    chain-announce-hold-ticks: 70
+    # 재앙 이름 룰렛이 돌아가는(이름이 바뀌는) 한 프레임당 시간 / 실제로 발동할 재앙에 멈추기 전까지 도는 횟수 (매 연쇄 단계마다 반복됨). 프레임끼리는 빈 화면 없이 바로 이어진다.
+    disaster-spin-ticks: 3
+    disaster-spin-count: 10
+    # 재앙 이름이 뜬 채로 유지되는 시간. 마지막 단계에서만 이 시간만큼 화면에 남아있고, 그 전 단계들은 다음 단계의 재앙 룰렛이 뜨기 직전까지 계속 화면에 남아있는다(빈 화면 없음).
+    disaster-land-hold-ticks: 25
+    # 한 재앙 이름이 뜨고 나서 다음 단계의 재앙 룰렛이 돌기 시작하기까지의 간격
+    chain-step-gap-ticks: 20
+
+    # 아포칼립스가 시작되기 settings.warning-seconds초 전에 전체 채팅으로 발송되는 경고
+    warning-message: "&c&l심상치 않은 기운이 온 세상을 뒤덮기 시작합니다... 곧 종말이 시작됩니다!"
+    # 아포칼립스가 실제로 시작되는 순간(타이틀 연출이 시작되는 순간) 전체 채팅으로 발송되는 메시지
+    appear-message: "&4&l아포칼립스가 시작되었습니다!"
