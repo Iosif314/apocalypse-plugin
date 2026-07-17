@@ -7,6 +7,7 @@ import net.apocalypse.plugin.disaster.impl.AcidRainDisaster;
 import net.apocalypse.plugin.disaster.impl.ApocalypseDisaster;
 import net.apocalypse.plugin.disaster.impl.BlizzardDisaster;
 import net.apocalypse.plugin.disaster.impl.DimensionalAnnihilationDisaster;
+import net.apocalypse.plugin.disaster.impl.FamineDisaster;
 import net.apocalypse.plugin.disaster.impl.MeteorStrikeDisaster;
 import net.apocalypse.plugin.disaster.impl.PlagueDisaster;
 import net.apocalypse.plugin.disaster.impl.SinkholeDisaster;
@@ -41,6 +42,7 @@ public final class ApocalypsePlugin extends JavaPlugin {
         disasterManager.register(new BlizzardDisaster());
         disasterManager.register(new DimensionalAnnihilationDisaster());
         disasterManager.register(new SinkholeDisaster());
+        disasterManager.register(new FamineDisaster());
         disasterManager.register(new ApocalypseDisaster(disasterManager));
         // 새 재앙을 추가할 때는 여기에 disasterManager.register(new XxxDisaster()); 한 줄만 추가하면 됩니다.
 

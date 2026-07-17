@@ -212,6 +212,13 @@ disasters:
     wither-amplifier: 4
     # 효과 한 번 걸릴 때 유지되는 시간(초)
     wither-duration-seconds: 5
+    # 비에 노출된 플레이어의 착용 방어구 각 부위에 판정마다 깎이는 내구도. 0이면 안 깎입니다.
+    # 실내로 피해도 이미 깎인 내구도는 되돌아오지 않아, 비가 그친 뒤에도 수리해야 하는 여파가 남습니다.
+    armor-durability-damage: 2
+    # 노출된 플레이어 주변 이 반경(블록) 안의 농작물/경작지가 부식 판정 대상이 됩니다.
+    crop-corrosion-radius: 6
+    # 판정 대상 블록 하나하나가 그때마다 부식될 확률(%)
+    crop-corrosion-chance-percent: 20.0
 
     warning-message: "&c&l하늘이 누렇게 물들며 매캐한 냄새가 퍼집니다... 곧 산성비가 내립니다!"
     appear-message: "&4&l산성비가 내리기 시작했습니다!"
@@ -340,6 +347,26 @@ disasters:
     warning-message: "&c&l땅속 깊은 곳에서 불길한 진동이 울려 퍼지기 시작합니다... 곧 대지가 무너져 내립니다!"
     # 타겟 위치가 정해지고 국지적 경고가 뜨는 순간 전체 채팅으로 발송되는 메시지
     appear-message: "&4&l어딘가의 땅이 위태롭게 흔들리기 시작했습니다..."
+
+  famine:
+    enabled: true
+    # /apocalypse trigger 처럼 종류를 지정하지 않고 무작위로 하나 고를 때의 가중치.
+    weight: 9
+    # 자동 발생 쿨타임/확률은 min-interval-seconds 등을 따로 안 정해뒀으면 위험도(현재 2단계 = 10~20분, 84%) 기본값을 씁니다.
+
+    # 기근이 지속되는 시간(초)
+    duration-seconds: 150
+    # 식량 부패/허기 소모를 판정하는 주기(틱, 20틱 = 1초). 너무 짧게 잡으면 순식간에 식량이 다 상합니다.
+    check-interval-ticks: 100
+    # 판정마다, 인벤토리 저장 칸에 있는 먹을 것 하나하나가 썩은 살덩이로 변할 확률(%)
+    food-spoil-chance-percent: 25.0
+    # 판정마다 자연 소모와 별개로 추가로 줄어드는 허기(포만도) 수치. 포만도가 0이 되면 이후엔 바닐라 굶주림 데미지가 들어갑니다.
+    hunger-drain-amount: 1
+
+    # 재앙이 발동하기 settings.warning-seconds초 전에 전체 채팅으로 발송되는 경고
+    warning-message: "&c&l곳간에서 쉰내가 진동하고 배 속이 텅 빈 듯한 불안감이 엄습합니다... 곧 기근이 찾아옵니다!"
+    # 재앙이 실제로 발동하는 순간 전체 채팅으로 발송되는 메시지
+    appear-message: "&4&l식량이 눈앞에서 상해가기 시작했습니다..."
 
   apocalypse:
     enabled: true
