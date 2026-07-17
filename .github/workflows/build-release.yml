@@ -20,7 +20,9 @@ jobs:
           java-version: '21'
 
       - name: Build plugin jar
-        run: ./gradlew shadowJar --no-daemon
+        run: |
+          chmod +x ./gradlew
+          ./gradlew shadowJar --no-daemon
 
       - name: Locate built jar
         id: jar
