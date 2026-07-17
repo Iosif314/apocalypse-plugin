@@ -15,9 +15,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * 등록된 재앙들을 관리한다. 각 재앙은 자신의 config 섹션에 있는
@@ -320,6 +322,22 @@ public class DisasterManager {
         }
 
         return stoppedCount;
+    }
+
+    /** 지금 경고 대기 중이거나 진행 중인 재앙들의 id를 중복 없이 모아 반환한다. /apoc stop 탭완성에 쓰인다. */
+    public Set<String> getStoppableDisasterIds() {
+        Set<String> ids = new LinkedHashSet<>();
+        for (PendingRun pending : pendingRuns) {
+            if (!pending.task().isCancelled()) {
+                ids.add(pending.disaster().getId());
+            }
+        }
+        for (ActiveRun run : activeRuns) {
+            if (run.context().activeTasks().stream().anyMatch(task -> !task.isCancelled())) {
+                ids.add(run.disaster().getId());
+            }
+        }
+        return ids;
     }
 
     private Disaster pickWeightedDisaster() {

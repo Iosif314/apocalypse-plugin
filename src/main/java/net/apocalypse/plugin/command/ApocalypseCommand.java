@@ -171,10 +171,16 @@ public class ApocalypseCommand implements CommandExecutor, TabCompleter {
             String prefix = args[0].toLowerCase();
             return SUBCOMMANDS.stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
         }
-        if (args.length == 2 && (args[0].equalsIgnoreCase("trigger") || args[0].equalsIgnoreCase("toggle")
-                || args[0].equalsIgnoreCase("stop"))) {
+        if (args.length == 2 && (args[0].equalsIgnoreCase("trigger") || args[0].equalsIgnoreCase("toggle"))) {
             String prefix = args[1].toLowerCase();
             return disasterManager.getDisasters().keySet().stream()
+                    .filter(id -> id.startsWith(prefix))
+                    .collect(Collectors.toList());
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("stop")) {
+            // stop은 아무 재앙 id나 다 받는 게 아니라, 지금 실제로 멈출 수 있는(대기/진행 중인) 것만 추천한다.
+            String prefix = args[1].toLowerCase();
+            return disasterManager.getStoppableDisasterIds().stream()
                     .filter(id -> id.startsWith(prefix))
                     .collect(Collectors.toList());
         }
