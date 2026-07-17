@@ -84,7 +84,7 @@ public class PlagueDisaster implements Disaster {
             infectPlayer(shuffled.get(i), infectedMessage);
         }
 
-        new BukkitRunnable() {
+        context.track(new BukkitRunnable() {
             long elapsed = 0;
 
             @Override
@@ -106,7 +106,13 @@ public class PlagueDisaster implements Disaster {
                     INFECTED_PLAYERS.clear();
                 }
             }
-        }.runTaskTimer(plugin, checkIntervalTicks, checkIntervalTicks);
+        }.runTaskTimer(plugin, checkIntervalTicks, checkIntervalTicks));
+    }
+
+    /** /apoc stop으로 강제 중단됐을 때, 자기 자신의 마지막 틱에서만 정리하던 감염 목록을 즉시 비운다. */
+    @Override
+    public void onStop(DisasterContext context) {
+        INFECTED_PLAYERS.clear();
     }
 
     /** 플레이어를 감염 목록에 추가하고 감염 메시지를 보낸다. */

@@ -93,7 +93,7 @@ public class StormDisaster implements Disaster {
         world.setWeatherDuration((int) totalTicks);
         world.setThunderDuration((int) totalTicks);
 
-        new BukkitRunnable() {
+        context.track(new BukkitRunnable() {
             long elapsed = 0;
 
             @Override
@@ -104,9 +104,9 @@ public class StormDisaster implements Disaster {
                     cancel();
                 }
             }
-        }.runTaskTimer(plugin, lightningIntervalTicks, lightningIntervalTicks);
+        }.runTaskTimer(plugin, lightningIntervalTicks, lightningIntervalTicks));
 
-        new BukkitRunnable() {
+        context.track(new BukkitRunnable() {
             long elapsed = 0;
 
             @Override
@@ -120,10 +120,10 @@ public class StormDisaster implements Disaster {
                     world.setThundering(false);
                 }
             }
-        }.runTaskTimer(plugin, windIntervalTicks, windIntervalTicks);
+        }.runTaskTimer(plugin, windIntervalTicks, windIntervalTicks));
 
         // 폭풍우가 시작되고 tornado-delay-seconds가 지난 뒤에야 토네이도가 생성된다.
-        new BukkitRunnable() {
+        context.track(new BukkitRunnable() {
             @Override
             public void run() {
                 List<Player> players = PlayerFilter.targetable(world.getPlayers());
@@ -135,13 +135,21 @@ public class StormDisaster implements Disaster {
                     int y = world.getHighestBlockYAt((int) Math.floor(x), (int) Math.floor(z));
                     Location start = new Location(world, x, y, z);
 
-                    spawnTornado(plugin, world, start, durationTicks, tornadoTickInterval, tornadoDriftSpeed,
+                    spawnTornado(context, plugin, world, start, durationTicks, tornadoTickInterval, tornadoDriftSpeed,
                             tornadoPullRadius, tornadoPullStrength, tornadoSpinStrength, tornadoLiftStrength,
                             tornadoMaxLiftHeight, tornadoDestructionRadius, tornadoDestructionHeight,
                             tornadoDestructionChance, tornadoDebrisChance, tornadoDestructionCellsPerTick, tornadoVisualHeight);
                 }
             }
-        }.runTaskLater(plugin, tornadoDelayTicks);
+        }.runTaskLater(plugin, tornadoDelayTicks));
+    }
+
+    /** /apoc stop으로 강제 중단됐을 때, 자기 자신의 마지막 틱에서만 원래대로 되돌리던 날씨 상태를 즉시 복구한다. */
+    @Override
+    public void onStop(DisasterContext context) {
+        World world = context.world();
+        world.setStorm(false);
+        world.setThundering(false);
     }
 
     /**
@@ -149,12 +157,12 @@ public class StormDisaster implements Disaster {
      * 원형으로 끌어올린다. 블록 파괴는 반경/높이가 매우 커서(수백만 셀) 한 번에 처리하면 랙이 나므로,
      * 운석 크레이터처럼 틱당 정해진 셀 수만큼만 처리하고 이어서 다음 틱에 계속하는 방식으로 나눠 돌린다.
      */
-    private void spawnTornado(Plugin plugin, World world, Location start, long durationTicks, long tickInterval,
+    private void spawnTornado(DisasterContext context, Plugin plugin, World world, Location start, long durationTicks, long tickInterval,
                                double driftSpeed, double pullRadius, double pullStrength, double spinStrength,
                                double liftStrength, double maxLiftHeight, double destructionRadius,
                                int destructionHeight, double destructionChance, double debrisChance,
                                int destructionCellsPerTick, int visualHeight) {
-        new BukkitRunnable() {
+        context.track(new BukkitRunnable() {
             final Location center = start.clone();
             Vector drift = randomHorizontalUnit().multiply(driftSpeed);
             long elapsed = 0;
@@ -188,7 +196,7 @@ public class StormDisaster implements Disaster {
                     cancel();
                 }
             }
-        }.runTaskTimer(plugin, 0L, tickInterval);
+        }.runTaskTimer(plugin, 0L, tickInterval));
     }
 
     /** 회오리 기둥을 따라 여러 층에 원형으로 회전하는 구름/전기 파티클을 뿌려서 눈에 보이는 소용돌이 모양을 만든다. */

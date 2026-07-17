@@ -41,6 +41,10 @@ public class MeteorStrikeDisaster implements Disaster {
 
     private final Random random = new Random();
 
+    // /apoc stop으로 비행 중에 강제로 멈추면 예약된 작업만 취소해선 이 비주얼(블록 디스플레이)이 공중에 남으므로,
+    // onStop에서 같이 지울 수 있도록 현재 날아가고 있는 운석의 비주얼을 기억해둔다.
+    private List<BlockDisplay> currentVisuals = new ArrayList<>();
+
     @Override
     public String getId() {
         return "meteor-strike";
@@ -104,11 +108,23 @@ public class MeteorStrikeDisaster implements Disaster {
                 .replace("%player%", target.getName());
 
         List<BlockDisplay> visuals = spawnMeteorVisual(world, spawnLoc, visualDiameter);
+        currentVisuals = visuals;
 
-        flyMeteor(plugin, world, spawnLoc, impactLoc, visuals, travelSpeed, visualDiameter, ColorUtil.parse(revealMessage),
+        flyMeteor(context, plugin, world, spawnLoc, impactLoc, visuals, travelSpeed, visualDiameter, ColorUtil.parse(revealMessage),
                 craterRadius, netherrackShell, cellsPerTick, minOres, maxOres, oreBlocks,
                 oreLaunchSpeedMin, oreLaunchSpeedMax,
                 soundVolume, soundPitch, directHitDamage, splashDamageMax, splashDamageMin);
+    }
+
+    /** /apoc stop으로 강제 중단됐을 때, 비행 중이던 운석 비주얼이 공중에 남지 않도록 지운다. */
+    @Override
+    public void onStop(DisasterContext context) {
+        for (BlockDisplay display : currentVisuals) {
+            if (!display.isDead()) {
+                display.remove();
+            }
+        }
+        currentVisuals = new ArrayList<>();
     }
 
     private List<Material> readOreBlocks(ConfigurationSection section) {
@@ -156,7 +172,7 @@ public class MeteorStrikeDisaster implements Disaster {
         return displays;
     }
 
-    private void flyMeteor(Plugin plugin, World world, Location spawnLoc, Location impactLoc,
+    private void flyMeteor(DisasterContext context, Plugin plugin, World world, Location spawnLoc, Location impactLoc,
                             List<BlockDisplay> visuals, double speed, double visualDiameter, Component revealMessage,
                             double craterRadius, boolean netherrackShell, int cellsPerTick,
                             int minOres, int maxOres, List<Material> oreBlocks,
@@ -169,7 +185,7 @@ public class MeteorStrikeDisaster implements Disaster {
         double midY = (spawnLoc.getY() + impactLoc.getY()) / 2.0;
         double hitRadius = visualDiameter / 2.0;
 
-        new BukkitRunnable() {
+        context.track(new BukkitRunnable() {
             double traveled = 0;
             boolean announced = false;
             final Location current = spawnLoc.clone();
@@ -205,12 +221,12 @@ public class MeteorStrikeDisaster implements Disaster {
                     visuals.forEach(Entity::remove);
                     world.playSound(impactLoc, Sound.ENTITY_GENERIC_EXPLODE, soundVolume, soundPitch);
                     applySplashDamage(world, impactLoc, craterRadius, splashDamageMax, splashDamageMin, hitEntities);
-                    excavateCrater(plugin, world, impactLoc, craterRadius, netherrackShell, cellsPerTick,
+                    excavateCrater(context, plugin, world, impactLoc, craterRadius, netherrackShell, cellsPerTick,
                             () -> spawnOreDebris(world, impactLoc, minOres, maxOres, oreBlocks,
                                     oreLaunchSpeedMin, oreLaunchSpeedMax));
                 }
             }
-        }.runTaskTimer(plugin, 0L, 1L);
+        }.runTaskTimer(plugin, 0L, 1L));
     }
 
     /** 운석 비주얼 반경 안에 들어온 엔티티에게 직격 데미지를 준다 (한 번만). */
@@ -264,8 +280,8 @@ public class MeteorStrikeDisaster implements Disaster {
      * 착탄 지점을 중심으로 구체 형태로 블록을 직접 제거하고, 그 바로 바깥 한 겹을 네더랙으로 채운다.
      * 실제 폭발파처럼 중심에서 가까운 셀부터 바깥으로 퍼져나가는 순서로 처리되며, 서버 랙 방지를 위해 여러 틱에 나눠 처리한다.
      */
-    private void excavateCrater(Plugin plugin, World world, Location center, double radius, boolean netherrackShell,
-                                 int cellsPerTick, Runnable onComplete) {
+    private void excavateCrater(DisasterContext context, Plugin plugin, World world, Location center, double radius,
+                                 boolean netherrackShell, int cellsPerTick, Runnable onComplete) {
         int cx = center.getBlockX();
         int cy = center.getBlockY();
         int cz = center.getBlockZ();
@@ -278,7 +294,7 @@ public class MeteorStrikeDisaster implements Disaster {
         // 중심에서 가까운 셀부터 처리되도록, 거리 기준으로 미리 정렬된 순서를 계산해둔다.
         int[] order = buildDistanceSortedOffsets(r);
 
-        new BukkitRunnable() {
+        context.track(new BukkitRunnable() {
             long index = 0;
 
             @Override
@@ -310,7 +326,7 @@ public class MeteorStrikeDisaster implements Disaster {
                     onComplete.run();
                 }
             }
-        }.runTaskTimer(plugin, 0L, 1L);
+        }.runTaskTimer(plugin, 0L, 1L));
     }
 
     /**

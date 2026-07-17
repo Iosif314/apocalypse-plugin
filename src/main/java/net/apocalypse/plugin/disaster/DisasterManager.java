@@ -33,6 +33,13 @@ public class DisasterManager {
     private final Map<String, Disaster> disasters = new LinkedHashMap<>();
     private final Map<String, BukkitTask> scheduledTasks = new HashMap<>();
 
+    // /apoc stop이 취소할 수 있도록, 아직 발동 전인(경고 대기 중인) 예약과 이미 발동해서 진행 중인 재앙들을 추적한다.
+    private final List<BukkitTask> pendingWarningTasks = new ArrayList<>();
+    private final List<ActiveRun> activeRuns = new ArrayList<>();
+
+    private record ActiveRun(Disaster disaster, DisasterContext context) {
+    }
+
     private boolean running = false;
 
     public DisasterManager(Plugin plugin, ToggleStore toggleStore) {
@@ -218,7 +225,9 @@ public class DisasterManager {
             if (players.isEmpty()) {
                 return;
             }
-            DisasterContext context = new DisasterContext(plugin, world, players, finalSection, immediate);
+            DisasterContext context = new DisasterContext(plugin, world, players, finalSection, immediate, new ArrayList<>());
+            pruneFinishedRuns();
+            activeRuns.add(new ActiveRun(disaster, context));
             disaster.trigger(context);
             broadcast(appearMessage);
         };
@@ -227,8 +236,44 @@ public class DisasterManager {
             spawn.run();
         } else {
             int warningSeconds = plugin.getConfig().getInt("settings.warning-seconds", 10);
-            Bukkit.getScheduler().runTaskLater(plugin, spawn, warningSeconds * 20L);
+            pendingWarningTasks.removeIf(BukkitTask::isCancelled);
+            pendingWarningTasks.add(Bukkit.getScheduler().runTaskLater(plugin, spawn, warningSeconds * 20L));
         }
+    }
+
+    /** 이미 모든 작업이 끝난(취소된) 지난 재앙 기록을 목록에서 정리한다. */
+    private void pruneFinishedRuns() {
+        activeRuns.removeIf(run -> run.context().activeTasks().stream().allMatch(BukkitTask::isCancelled));
+    }
+
+    /**
+     * 경고 대기 중인 예약과 현재 진행 중인 재앙을 전부 강제로 멈춘다. 예약된 작업(BukkitTask)을 모두 취소하고,
+     * 날씨/게임규칙/위장처럼 재앙이 스스로 끝날 때만 되돌리던 영구적인 상태는 각 재앙의 onStop()으로 즉시 복구시킨다.
+     * 실제로 멈춘 개수(대기 중이던 예약 + 진행 중이던 재앙)를 반환한다.
+     */
+    public int stopCurrent() {
+        int stoppedCount = 0;
+
+        for (BukkitTask task : pendingWarningTasks) {
+            if (!task.isCancelled()) {
+                task.cancel();
+                stoppedCount++;
+            }
+        }
+        pendingWarningTasks.clear();
+
+        for (ActiveRun run : activeRuns) {
+            for (BukkitTask task : run.context().activeTasks()) {
+                if (!task.isCancelled()) {
+                    task.cancel();
+                }
+            }
+            run.disaster().onStop(run.context());
+            stoppedCount++;
+        }
+        activeRuns.clear();
+
+        return stoppedCount;
     }
 
     private Disaster pickWeightedDisaster() {

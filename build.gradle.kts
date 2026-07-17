@@ -25,6 +25,9 @@ repositories {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT")
+    // update-note 명령어에서 GitHub API 응답(JSON)을 파싱하는 데 쓴다. Paper 서버가 이미 Gson을 내장하고
+    // 있어서 실행 시점에는 이 의존성이 없어도 되므로(compileOnly), 우리 jar에 다시 포함하지 않는다.
+    compileOnly("com.google.code.gson:gson:2.11.0")
 }
 
 tasks {

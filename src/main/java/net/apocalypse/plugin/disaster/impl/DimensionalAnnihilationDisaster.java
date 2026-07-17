@@ -67,7 +67,7 @@ public class DimensionalAnnihilationDisaster implements Disaster {
         // 타겟만 지금 정해두고, 위치는 고정하지 않는다 — 소멸 직전(1분 뒤)의 위치를 기준으로 삼는다.
         Player initialTarget = players.get(random.nextInt(players.size()));
 
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        context.track(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             Player target = initialTarget;
             if (!target.isOnline()) {
                 // 그 사이 타겟이 접속을 종료했으면, 그 시점에 그 월드에 있는 플레이어 중 새로 하나를 다시 뽑는다.
@@ -88,7 +88,7 @@ public class DimensionalAnnihilationDisaster implements Disaster {
 
             annihilateChunk(world, chunk, playerDamage);
             Bukkit.broadcast(annihilationMessage);
-        }, annihilationDelayTicks);
+        }, annihilationDelayTicks));
     }
 
     /** 청크 안의 모든 엔티티를 지우고(플레이어는 대신 큰 데미지), 모든 블록을 공기로 만든다. */

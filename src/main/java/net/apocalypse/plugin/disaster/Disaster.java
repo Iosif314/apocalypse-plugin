@@ -18,4 +18,13 @@ public interface Disaster {
 
     /** 실제 재앙 효과를 실행합니다. */
     void trigger(DisasterContext context);
+
+    /**
+     * /apoc stop 등으로 이 재앙이 진행 중에 강제로 멈춰질 때 호출됩니다. 예약된 작업(BukkitTask)들은
+     * DisasterManager가 이미 전부 취소한 뒤이므로, 여기서는 날씨/게임규칙/위장처럼 재앙 시작 시 바꿔놓고
+     * 자기 자신의 마지막 틱에서만 되돌리던 "영구적인" 상태를 즉시 원래대로 복구하는 역할만 하면 됩니다.
+     * 예약된 작업 취소만으로 충분히 안전하게 끝나는 재앙(순간적인 파괴 등)은 굳이 구현하지 않아도 됩니다.
+     */
+    default void onStop(DisasterContext context) {
+    }
 }

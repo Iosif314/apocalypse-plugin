@@ -84,7 +84,7 @@ public class ApocalypseDisaster implements Disaster {
             offset += letterFrameTicks;
             // 마지막 글자는 다음 단계(말줄임표)가 더 느린 템포로 뜨므로, 그때까지 화면에 남아있도록 유지 시간을 늘린다.
             long stay = (i == chars.length) ? suspenseFrameTicks + 2 : letterFrameTicks + 2;
-            schedule(plugin, offset, () -> {
+            schedule(context, offset, () -> {
                 showTitle(titleComponent, Component.empty(), stay);
                 playRouletteTick();
             });
@@ -97,7 +97,7 @@ public class ApocalypseDisaster implements Disaster {
             offset += suspenseFrameTicks;
             // 마지막 점은 "아포칼립스" 타이틀이 뜨기 직전까지 화면에 남아있도록 유지 시간을 늘린다.
             long stay = (dotCount == 3) ? titleHoldTicks + 2 : suspenseFrameTicks + 2;
-            schedule(plugin, offset, () -> {
+            schedule(context, offset, () -> {
                 showTitle(dotsTitle, Component.empty(), stay);
                 playRouletteTick();
             });
@@ -106,7 +106,7 @@ public class ApocalypseDisaster implements Disaster {
         // 2) "아포칼립스" 타이틀로 전환. 숫자 룰렛이 돌기 시작하기 직전까지 화면에 남아있도록 유지 시간을 이어붙인다.
         Component apocalypseTitle = Component.text(getDisplayName(), NamedTextColor.DARK_RED);
         offset += titleHoldTicks;
-        schedule(plugin, offset, () -> {
+        schedule(context, offset, () -> {
             showTitle(apocalypseTitle, Component.empty(), rouletteSpinTicks + 2);
             playApocalypseRoar();
         });
@@ -122,7 +122,7 @@ public class ApocalypseDisaster implements Disaster {
             int spinValue = minChain + random.nextInt(maxChain - minChain + 1);
             Component subtitle = Component.text(String.valueOf(spinValue), NamedTextColor.RED);
             offset += rouletteSpinTicks;
-            schedule(plugin, offset, () -> {
+            schedule(context, offset, () -> {
                 showTitle(apocalypseTitle, subtitle, rouletteSpinTicks + 2);
                 playRouletteTick();
             });
@@ -130,7 +130,7 @@ public class ApocalypseDisaster implements Disaster {
         Component landedNumber = Component.text(String.valueOf(chainCount), NamedTextColor.RED);
         offset += rouletteSpinTicks;
         // 룰렛이 멈춘 뒤(실제 값이 뜬 채로) "연속 N회 재앙 발생" 문구가 뜨기 직전까지 화면에 남아있는다.
-        schedule(plugin, offset, () -> {
+        schedule(context, offset, () -> {
             showTitle(apocalypseTitle, landedNumber, chainAnnounceHoldTicks + 2);
             playRouletteTick();
         });
@@ -140,7 +140,7 @@ public class ApocalypseDisaster implements Disaster {
         Component chainChatMessage = ColorUtil.parse("&4&l\"아포칼립스\" 재앙 발생! 재앙이 " + chainCount + "회 발생합니다!");
         offset += chainAnnounceHoldTicks;
         // "연속 N회 재앙 발생" 문구는 첫 재앙 이름이 뜨기 직전까지 화면에 남아있는다.
-        schedule(plugin, offset, () -> {
+        schedule(context, offset, () -> {
             showTitle(apocalypseTitle, chainAnnounce, chainAnnounceHoldTicks + 2);
             Bukkit.broadcast(chainChatMessage);
         });
@@ -156,7 +156,7 @@ public class ApocalypseDisaster implements Disaster {
                 if (i > 0) {
                     offset += disasterSpinTicks;
                 }
-                schedule(plugin, offset, () -> {
+                schedule(context, offset, () -> {
                     showTitle(apocalypseTitle, subtitle, disasterSpinTicks + 2);
                     playRouletteTick();
                 });
@@ -172,7 +172,7 @@ public class ApocalypseDisaster implements Disaster {
             boolean hasNextStep = step < chainCount - 1;
             long stay = hasNextStep ? chainStepGapTicks + 2 : disasterLandHoldTicks;
             offset += disasterSpinTicks;
-            schedule(plugin, offset, () -> {
+            schedule(context, offset, () -> {
                 showTitle(apocalypseTitle, landed, stay);
                 playDangerSound(chosen.getDangerLevel());
                 Bukkit.broadcast(landedChatMessage);
@@ -207,8 +207,8 @@ public class ApocalypseDisaster implements Disaster {
         return pool;
     }
 
-    private void schedule(Plugin plugin, long delayTicks, Runnable action) {
-        Bukkit.getScheduler().runTaskLater(plugin, action, delayTicks);
+    private void schedule(DisasterContext context, long delayTicks, Runnable action) {
+        context.track(Bukkit.getScheduler().runTaskLater(context.plugin(), action, delayTicks));
     }
 
     private void showTitle(Component title, Component subtitle, long stayTicks) {

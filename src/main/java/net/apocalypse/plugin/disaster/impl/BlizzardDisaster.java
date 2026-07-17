@@ -90,7 +90,7 @@ public class BlizzardDisaster implements Disaster {
         // 효과가 다음 판정 전에 끊기지 않도록 체크 주기보다 살짝 여유를 둔다.
         int slownessDurationTicks = (int) (checkIntervalTicks + 20);
 
-        new BukkitRunnable() {
+        context.track(new BukkitRunnable() {
             long elapsed = 0;
             long sinceBlockEffect = 0;
 
@@ -134,7 +134,7 @@ public class BlizzardDisaster implements Disaster {
                     cancel();
                 }
             }
-        }.runTaskTimer(plugin, checkIntervalTicks, checkIntervalTicks);
+        }.runTaskTimer(plugin, checkIntervalTicks, checkIntervalTicks));
     }
 
     /** 실제 바이옴 강수와 무관하게, 플레이어 머리 위에 눈이 흩날리는 것처럼 파티클을 뿌린다. */

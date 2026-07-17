@@ -51,7 +51,7 @@ public class AcidRainDisaster implements Disaster {
         world.setThundering(false);
         world.setWeatherDuration((int) durationTicks);
 
-        new BukkitRunnable() {
+        context.track(new BukkitRunnable() {
             long elapsed = 0;
 
             @Override
@@ -64,7 +64,13 @@ public class AcidRainDisaster implements Disaster {
                     world.setStorm(false);
                 }
             }
-        }.runTaskTimer(plugin, checkIntervalTicks, checkIntervalTicks);
+        }.runTaskTimer(plugin, checkIntervalTicks, checkIntervalTicks));
+    }
+
+    /** /apoc stop으로 강제 중단됐을 때, 자기 자신의 마지막 틱에서만 되돌리던 날씨 상태를 즉시 복구한다. */
+    @Override
+    public void onStop(DisasterContext context) {
+        context.world().setStorm(false);
     }
 
     /** 비를 맞고 있는 플레이어들에게 시듦 효과를 걸거나 갱신한다. */

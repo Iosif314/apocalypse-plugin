@@ -3,6 +3,7 @@ package net.apocalypse.plugin.command;
 import net.apocalypse.plugin.disaster.Disaster;
 import net.apocalypse.plugin.disaster.DisasterManager;
 import net.apocalypse.plugin.util.ColorUtil;
+import net.apocalypse.plugin.util.GitHubUpdateNote;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -17,7 +18,7 @@ import java.util.stream.Collectors;
 
 public class ApocalypseCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUBCOMMANDS = List.of("trigger", "toggle", "reload", "list");
+    private static final List<String> SUBCOMMANDS = List.of("trigger", "toggle", "reload", "list", "stop", "update-note");
 
     private final Plugin plugin;
     private final DisasterManager disasterManager;
@@ -39,6 +40,8 @@ public class ApocalypseCommand implements CommandExecutor, TabCompleter {
             case "toggle" -> handleToggle(sender, args);
             case "reload" -> handleReload(sender);
             case "list" -> handleList(sender);
+            case "stop" -> handleStop(sender);
+            case "update-note" -> handleUpdateNote(sender);
             default -> sendUsage(sender, label);
         }
         return true;
@@ -94,6 +97,24 @@ public class ApocalypseCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void handleStop(CommandSender sender) {
+        int stopped = disasterManager.stopCurrent();
+        if (stopped > 0) {
+            sender.sendMessage(ColorUtil.parse("&a진행 중이거나 대기 중이던 재앙을 멈췄습니다."));
+        } else {
+            sender.sendMessage(ColorUtil.parse("&e지금 멈출 재앙이 없습니다."));
+        }
+    }
+
+    private void handleUpdateNote(CommandSender sender) {
+        String repo = plugin.getConfig().getString("settings.github-repo", "");
+        if (repo.isBlank()) {
+            sender.sendMessage(ColorUtil.parse("&csettings.github-repo가 설정되어 있지 않습니다."));
+            return;
+        }
+        GitHubUpdateNote.fetchLatestCommit(plugin, sender, repo);
+    }
+
     private void handleReload(CommandSender sender) {
         plugin.reloadConfig();
         sender.sendMessage(ColorUtil.parse("&a설정을 다시 불러왔습니다."));
@@ -112,6 +133,8 @@ public class ApocalypseCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ColorUtil.parse("&6/" + label + " toggle [종류] &7- 특정 재앙만 자동 발생을 켜거나 끕니다. (저장됨)"));
         sender.sendMessage(ColorUtil.parse("&6/" + label + " reload &7- 설정을 다시 불러옵니다."));
         sender.sendMessage(ColorUtil.parse("&6/" + label + " list &7- 사용 가능한 재앙 종류를 확인합니다."));
+        sender.sendMessage(ColorUtil.parse("&6/" + label + " stop &7- 진행 중이거나 대기 중인 재앙을 멈춥니다."));
+        sender.sendMessage(ColorUtil.parse("&6/" + label + " update-note &7- GitHub 저장소의 가장 최근 커밋 정보를 보여줍니다."));
     }
 
     private World firstConfiguredWorld() {

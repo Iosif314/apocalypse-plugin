@@ -73,12 +73,12 @@ public class SinkholeDisaster implements Disaster {
             }
         }
 
-        new BukkitRunnable() {
+        context.track(new BukkitRunnable() {
             @Override
             public void run() {
                 collapseSinkhole(world, center, sinkholeRadius, sinkholeDepth);
             }
-        }.runTaskLater(plugin, collapseDelayTicks);
+        }.runTaskLater(plugin, collapseDelayTicks));
     }
 
     /** 고정된 위치를 중심으로 원기둥 모양 구덩이를 만들며 지면 아래로 파고든다. */

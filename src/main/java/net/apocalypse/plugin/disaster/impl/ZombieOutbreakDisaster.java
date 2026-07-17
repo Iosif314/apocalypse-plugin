@@ -49,6 +49,9 @@ public class ZombieOutbreakDisaster implements Disaster {
      */
     public static final Set<UUID> DISGUISED_PLAYERS = ConcurrentHashMap.newKeySet();
 
+    // /apoc stop으로 강제 중단됐을 때도 위장을 전부 풀 수 있도록, trigger()의 지역 변수가 아니라 필드로 둔다.
+    private final Map<UUID, Zombie> disguisePuppets = new HashMap<>();
+
     private final Random random = new Random();
 
     @Override
@@ -84,14 +87,13 @@ public class ZombieOutbreakDisaster implements Disaster {
 
         NamespacedKey key = new NamespacedKey(plugin, KEY_NAME);
         NamespacedKey jumpModifierKey = new NamespacedKey(plugin, JUMP_MODIFIER_KEY_NAME);
-        Map<UUID, Zombie> disguisePuppets = new HashMap<>();
 
         // 좀비는 주기적인 웨이브가 아니라, 발동 시점에 플레이어마다 한 번에 몰아서 소환한다.
         for (Player player : PlayerFilter.targetable(world.getPlayers())) {
             spawnZombieWave(world, player.getLocation(), minZombies, maxZombies, spawnRadius);
         }
 
-        new BukkitRunnable() {
+        context.track(new BukkitRunnable() {
             long elapsed = 0;
 
             @Override
@@ -105,7 +107,15 @@ public class ZombieOutbreakDisaster implements Disaster {
                     clearAllDisguises(plugin, disguisePuppets, jumpModifierKey);
                 }
             }
-        }.runTaskTimer(plugin, disguiseCheckTicks, disguiseCheckTicks);
+        }.runTaskTimer(plugin, disguiseCheckTicks, disguiseCheckTicks));
+    }
+
+    /** /apoc stop으로 강제 중단됐을 때, 자기 자신의 마지막 틱에서만 풀어주던 위장을 즉시 전부 해제한다. */
+    @Override
+    public void onStop(DisasterContext context) {
+        Plugin plugin = context.plugin();
+        NamespacedKey jumpModifierKey = new NamespacedKey(plugin, JUMP_MODIFIER_KEY_NAME);
+        clearAllDisguises(plugin, disguisePuppets, jumpModifierKey);
     }
 
     private void spawnZombieWave(World world, Location center, int minZombies, int maxZombies, double radius) {

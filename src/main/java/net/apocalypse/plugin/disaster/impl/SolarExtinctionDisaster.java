@@ -14,6 +14,9 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * 지속 시간 동안 태양이 사라진 것처럼 낮/밤 주기를 멈추고 강제로 밤으로 고정한다.
  * 하늘이 뚫린 곳(지붕이 없는 곳)에 있는 플레이어에게는 주기적으로 어둠(Darkness) 효과를 걸어 시야를 가린다.
@@ -23,6 +26,9 @@ import org.bukkit.scheduler.BukkitRunnable;
 public class SolarExtinctionDisaster implements Disaster {
 
     private static final long NIGHT_TIME = 18000L;
+
+    // /apoc stop으로 강제 중단됐을 때도 원래 시간으로 되돌릴 수 있도록, 월드별로 소멸 직전 시간을 기억해둔다.
+    private final Map<World, Long> originalTimes = new HashMap<>();
 
     @Override
     public String getId() {
@@ -50,12 +56,12 @@ public class SolarExtinctionDisaster implements Disaster {
         int darknessDurationTicks = (int) (Math.max(1, section.getLong("darkness-duration-seconds", 5)) * 20L);
 
         // 태양이 돌아왔을 때 원래 흐름대로 이어지도록, 소멸시키기 전의 시간을 기억해둔다.
-        long originalTime = world.getTime();
+        originalTimes.put(world, world.getTime());
 
         world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
         world.setTime(NIGHT_TIME);
 
-        new BukkitRunnable() {
+        context.track(new BukkitRunnable() {
             long elapsed = 0;
 
             @Override
@@ -65,11 +71,24 @@ public class SolarExtinctionDisaster implements Disaster {
 
                 if (elapsed >= durationTicks) {
                     cancel();
-                    world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, true);
-                    world.setTime(originalTime);
+                    restoreSun(world);
                 }
             }
-        }.runTaskTimer(plugin, darknessIntervalTicks, darknessIntervalTicks);
+        }.runTaskTimer(plugin, darknessIntervalTicks, darknessIntervalTicks));
+    }
+
+    /** /apoc stop으로 강제 중단됐을 때, 자기 자신의 마지막 틱에서만 되돌리던 낮/밤 주기와 시간을 즉시 복구한다. */
+    @Override
+    public void onStop(DisasterContext context) {
+        restoreSun(context.world());
+    }
+
+    private void restoreSun(World world) {
+        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, true);
+        Long originalTime = originalTimes.remove(world);
+        if (originalTime != null) {
+            world.setTime(originalTime);
+        }
     }
 
     /** 하늘이 뚫린 곳에 있는 플레이어들에게 어둠 효과를 걸거나 갱신한다. */
