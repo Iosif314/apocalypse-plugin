@@ -2,6 +2,9 @@
 # 이미 받은 버전(release id)과 같으면 아무 작업도 하지 않는다.
 # 서버가 켜져 있고 RCON이 활성화돼 있으면 plugman으로 안전하게 언로드 -> 교체 -> 로드한다.
 #
+# 작업 스케줄러로 돌리면 콘솔 창이 안 보여서 무슨 일이 있었는지 확인할 수 없으므로,
+# 실행할 때마다 이 스크립트와 같은 폴더의 update-plugin.log에 결과를 남긴다.
+#
 # 사용 전 아래 값들을 이 컴퓨터(실제 서버) 환경에 맞게 수정하세요.
 
 $RepoOwner = "Iosif314"
@@ -10,6 +13,15 @@ $ServerDir = "C:\Users\USER\Documents\Plugin Test"
 $PluginsDir = Join-Path $ServerDir "plugins"
 $JarName = "Apocalypse.jar"
 $MarkerFile = Join-Path $PSScriptRoot ".last-release-id"
+$LogFile = Join-Path $PSScriptRoot "update-plugin.log"
+
+function Write-Log {
+    param([string]$Message)
+    $line = "[{0}] {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Message
+    Write-Host $line
+    # Windows PowerShell 5.1의 Add-Content 기본 인코딩은 한글이 깨지므로 UTF8로 명시한다.
+    Add-Content -Path $LogFile -Value $line -Encoding UTF8
+}
 
 function Get-ServerProperty {
     param([string]$Key, [string]$Default)
@@ -83,53 +95,70 @@ function Send-Rcon {
     }
 }
 
-# 1) 최신 릴리스 정보 확인
-$release = Invoke-RestMethod -Uri "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest" -Headers @{ "User-Agent" = "apocalypse-updater" }
-$releaseId = $release.id.ToString()
+Write-Log "===== update-plugin 시작 ====="
 
-$lastId = if (Test-Path $MarkerFile) { (Get-Content $MarkerFile -Raw).Trim() } else { "" }
-if ($releaseId -eq $lastId) {
-    Write-Host "[update-plugin] 이미 최신 버전입니다. (release id: $releaseId)"
-    exit 0
-}
+try {
+    # 0) 서버 경로가 아직 이 컴퓨터에 맞게 수정되지 않았으면 여기서 바로 알아챌 수 있게 확인한다.
+    if (-not (Test-Path $ServerDir)) {
+        Write-Log "오류: ServerDir 경로가 존재하지 않습니다: $ServerDir (스크립트 위쪽의 `$ServerDir 값을 이 컴퓨터 경로로 수정하세요)"
+        exit 1
+    }
 
-$asset = $release.assets | Where-Object { $_.name -like "*.jar" } | Select-Object -First 1
-if ($null -eq $asset) {
-    Write-Error "[update-plugin] 릴리스에서 jar 파일을 찾지 못했습니다."
+    # 1) 최신 릴리스 정보 확인
+    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest" -Headers @{ "User-Agent" = "apocalypse-updater" }
+    $releaseId = $release.id.ToString()
+
+    $lastId = if (Test-Path $MarkerFile) { (Get-Content $MarkerFile -Raw).Trim() } else { "" }
+    if ($releaseId -eq $lastId) {
+        Write-Log "이미 최신 버전입니다. (release id: $releaseId)"
+        exit 0
+    }
+
+    $asset = $release.assets | Where-Object { $_.name -like "*.jar" } | Select-Object -First 1
+    if ($null -eq $asset) {
+        Write-Log "오류: 릴리스에서 jar 파일을 찾지 못했습니다."
+        exit 1
+    }
+
+    # 2) jar 다운로드
+    $tempJar = Join-Path $env:TEMP "Apocalypse-download.jar"
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $tempJar -Headers @{ "User-Agent" = "apocalypse-updater" }
+    Write-Log "새 버전 다운로드 완료 (release id: $releaseId, 이전: $(if ($lastId) { $lastId } else { '없음' }))"
+
+    $serverRunning = Test-ServerRunning
+    $rconEnabled = (Get-ServerProperty -Key "enable-rcon" -Default "false") -eq "true"
+    $rconPort = [int](Get-ServerProperty -Key "rcon.port" -Default "25575")
+    $rconPassword = Get-ServerProperty -Key "rcon.password" -Default ""
+    Write-Log "서버 실행 중: $serverRunning / RCON 활성화: $rconEnabled"
+
+    # 3) 켜져 있으면 언로드 -> 교체 -> 로드, 꺼져 있으면 그냥 교체
+    if ($serverRunning -and $rconEnabled) {
+        try {
+            Send-Rcon -Port $rconPort -Password $rconPassword -Command "plugman unload Apocalypse" | Out-Null
+            Write-Log "플러그인 언로드 완료"
+        } catch {
+            Write-Log "경고: 언로드 실패: $_"
+        }
+    }
+
+    New-Item -ItemType Directory -Force -Path $PluginsDir | Out-Null
+    Copy-Item -Path $tempJar -Destination (Join-Path $PluginsDir $JarName) -Force
+    Write-Log "$JarName 교체 완료 ($PluginsDir)"
+
+    if ($serverRunning -and $rconEnabled) {
+        try {
+            Send-Rcon -Port $rconPort -Password $rconPassword -Command "plugman load Apocalypse" | Out-Null
+            Write-Log "플러그인 로드 완료"
+        } catch {
+            Write-Log "경고: 로드 실패: $_"
+        }
+    }
+
+    Set-Content -Path $MarkerFile -Value $releaseId
+    Write-Log "업데이트 완료 (release id: $releaseId)"
+} catch {
+    Write-Log "오류: 스크립트 실행 중 예외 발생: $_"
     exit 1
+} finally {
+    Write-Log "===== update-plugin 종료 ====="
 }
-
-# 2) jar 다운로드
-$tempJar = Join-Path $env:TEMP "Apocalypse-download.jar"
-Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $tempJar -Headers @{ "User-Agent" = "apocalypse-updater" }
-
-$serverRunning = Test-ServerRunning
-$rconEnabled = (Get-ServerProperty -Key "enable-rcon" -Default "false") -eq "true"
-$rconPort = [int](Get-ServerProperty -Key "rcon.port" -Default "25575")
-$rconPassword = Get-ServerProperty -Key "rcon.password" -Default ""
-
-# 3) 켜져 있으면 언로드 -> 교체 -> 로드, 꺼져 있으면 그냥 교체
-if ($serverRunning -and $rconEnabled) {
-    try {
-        Send-Rcon -Port $rconPort -Password $rconPassword -Command "plugman unload Apocalypse" | Out-Null
-        Write-Host "[update-plugin] 플러그인 언로드 완료"
-    } catch {
-        Write-Warning "[update-plugin] 언로드 실패: $_"
-    }
-}
-
-New-Item -ItemType Directory -Force -Path $PluginsDir | Out-Null
-Copy-Item -Path $tempJar -Destination (Join-Path $PluginsDir $JarName) -Force
-Write-Host "[update-plugin] $JarName 교체 완료"
-
-if ($serverRunning -and $rconEnabled) {
-    try {
-        Send-Rcon -Port $rconPort -Password $rconPassword -Command "plugman load Apocalypse" | Out-Null
-        Write-Host "[update-plugin] 플러그인 로드 완료"
-    } catch {
-        Write-Warning "[update-plugin] 로드 실패: $_"
-    }
-}
-
-Set-Content -Path $MarkerFile -Value $releaseId
-Write-Host "[update-plugin] 업데이트 완료 (release id: $releaseId)"
