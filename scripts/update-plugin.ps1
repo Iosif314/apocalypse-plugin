@@ -1,5 +1,5 @@
 # GitHub 릴리스("latest" 태그)에서 최신 Apocalypse.jar를 받아와 이 컴퓨터의 서버 plugins 폴더에 반영한다.
-# 이미 받은 버전(release id)과 같으면 아무 작업도 하지 않는다.
+# 이미 받은 버전(jar 에셋 id)과 같으면 아무 작업도 하지 않는다.
 # 서버가 켜져 있고 RCON이 활성화돼 있으면 plugman으로 안전하게 언로드 -> 교체 -> 로드한다.
 #
 # 작업 스케줄러로 돌리면 콘솔 창이 안 보여서 무슨 일이 있었는지 확인할 수 없으므로,
@@ -105,25 +105,28 @@ try {
     }
 
     # 1) 최신 릴리스 정보 확인
+    # 주의: "latest" 태그는 빌드할 때마다 같은 릴리스를 덮어쓰는 방식이라 release.id 자체는 항상 동일하다.
+    # 그래서 버전이 바뀌었는지는 릴리스 id가 아니라, 빌드마다 다시 올라오면서 실제로 바뀌는
+    # "jar 에셋 자신의 id"로 비교해야 한다.
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest" -Headers @{ "User-Agent" = "apocalypse-updater" }
-    $releaseId = $release.id.ToString()
-
-    $lastId = if (Test-Path $MarkerFile) { (Get-Content $MarkerFile -Raw).Trim() } else { "" }
-    if ($releaseId -eq $lastId) {
-        Write-Log "이미 최신 버전입니다. (release id: $releaseId)"
-        exit 0
-    }
 
     $asset = $release.assets | Where-Object { $_.name -like "*.jar" } | Select-Object -First 1
     if ($null -eq $asset) {
         Write-Log "오류: 릴리스에서 jar 파일을 찾지 못했습니다."
         exit 1
     }
+    $assetId = $asset.id.ToString()
+
+    $lastId = if (Test-Path $MarkerFile) { (Get-Content $MarkerFile -Raw).Trim() } else { "" }
+    if ($assetId -eq $lastId) {
+        Write-Log "이미 최신 버전입니다. (asset id: $assetId)"
+        exit 0
+    }
 
     # 2) jar 다운로드
     $tempJar = Join-Path $env:TEMP "Apocalypse-download.jar"
     Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $tempJar -Headers @{ "User-Agent" = "apocalypse-updater" }
-    Write-Log "새 버전 다운로드 완료 (release id: $releaseId, 이전: $(if ($lastId) { $lastId } else { '없음' }))"
+    Write-Log "새 버전 다운로드 완료 (asset id: $assetId, 이전: $(if ($lastId) { $lastId } else { '없음' }))"
 
     $serverRunning = Test-ServerRunning
     $rconEnabled = (Get-ServerProperty -Key "enable-rcon" -Default "false") -eq "true"
@@ -154,8 +157,8 @@ try {
         }
     }
 
-    Set-Content -Path $MarkerFile -Value $releaseId
-    Write-Log "업데이트 완료 (release id: $releaseId)"
+    Set-Content -Path $MarkerFile -Value $assetId
+    Write-Log "업데이트 완료 (asset id: $assetId)"
 } catch {
     Write-Log "오류: 스크립트 실행 중 예외 발생: $_"
     exit 1
