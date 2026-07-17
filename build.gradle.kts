@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "net.apocalypse"
-version = "1.10.9"
+version = "1.10.10"
 
 java {
     toolchain {

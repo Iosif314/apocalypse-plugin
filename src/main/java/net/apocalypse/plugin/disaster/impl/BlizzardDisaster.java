@@ -21,6 +21,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -103,6 +104,8 @@ public class BlizzardDisaster implements Disaster {
                     sinceBlockEffect = 0;
                 }
 
+                List<Player> exposedPlayers = doBlockEffects ? new ArrayList<>() : List.of();
+
                 for (Player player : world.getPlayers()) {
                     if (!PlayerFilter.isTargetable(player)) {
                         continue;
@@ -113,21 +116,24 @@ public class BlizzardDisaster implements Disaster {
                     boolean warm = isNearHeatSource(world, player, heatSourceRadius);
 
                     if (exposed && doBlockEffects) {
-                        freezeNearbyWater(world, player, freezeRadius);
                         player.playSound(player.getLocation(), Sound.ENTITY_BREEZE_WHIRL, windSoundVolume, windSoundPitch);
+                        exposedPlayers.add(player);
                     }
                     if (!warm) {
                         applyFrostbite(player, slownessDurationTicks, slownessAmplifier, frostbiteDamage);
                     }
-                    // 눈은 하늘이 뚫려 있을 때만, 그리고 무거운 지형 작업 주기가 돌아왔을 때만 쌓인다.
-                    // 열원 근처인지는 플레이어 위치가 아니라 각 칸(컬럼)마다 따로 판정한다(아래 accumulateSnow 참고).
-                    // 다만 열원 탐색 자체는 비용 때문에 플레이어 주변(heat-source-radius)만 훑으므로,
-                    // 플레이어에게서 heat-source-radius보다 멀리 떨어진 열원은 보호 범위 밖이다.
-                    if (exposed && doBlockEffects) {
-                        List<Block> nearbyHeatSources = findHeatSources(world, player, heatSourceRadius);
-                        accumulateSnow(world, player, snowAccumulationRadius, snowMaxLayers,
-                                nearbyHeatSources, heatSourceRadius);
-                    }
+                }
+
+                // 눈 쌓임/얼음 얼리기/열원 탐색은 하늘이 뚫린 플레이어들을 한 번에 모아 처리한다.
+                // 열원 근처인지는 플레이어 위치가 아니라 각 칸(컬럼)마다 따로 판정한다(아래 accumulateSnow 참고).
+                // 다만 열원 탐색 자체는 비용 때문에 플레이어 주변(heat-source-radius)만 훑으므로,
+                // 모든 플레이어에게서 heat-source-radius보다 멀리 떨어진 열원은 보호 범위 밖이다.
+                // 플레이어들이 서로 가까이 모여 있어 범위가 겹쳐도, 같은 칸/같은 블록은 한 번씩만 검사·기록한다.
+                if (doBlockEffects && !exposedPlayers.isEmpty()) {
+                    freezeNearbyWater(world, exposedPlayers, freezeRadius);
+                    List<Block> nearbyHeatSources = findHeatSources(world, exposedPlayers, heatSourceRadius);
+                    accumulateSnow(world, exposedPlayers, snowAccumulationRadius, snowMaxLayers,
+                            nearbyHeatSources, heatSourceRadius);
                 }
 
                 if (elapsed >= durationTicks) {
@@ -151,93 +157,113 @@ public class BlizzardDisaster implements Disaster {
         }
     }
 
-    /** 플레이어 주변 지표수를 얼음으로 바꾼다. */
-    private void freezeNearbyWater(World world, Player player, double radius) {
-        int r = (int) Math.ceil(radius);
-        int centerX = player.getLocation().getBlockX();
-        int centerZ = player.getLocation().getBlockZ();
-        double radiusSquared = radius * radius;
+    /** (x,z) 칸 좌표를 겹치는 곳 없이 유일한 long 키로 압축한다. 여러 플레이어의 범위가 겹칠 때 중복 칸을 걸러내는 데 쓴다. */
+    private static long columnKey(int x, int z) {
+        return ((long) x << 32) | (z & 0xFFFFFFFFL);
+    }
 
-        for (int dx = -r; dx <= r; dx++) {
-            for (int dz = -r; dz <= r; dz++) {
-                if (dx * dx + dz * dz > radiusSquared) {
-                    continue;
-                }
-                int x = centerX + dx;
-                int z = centerZ + dz;
-                Block surface = world.getHighestBlockAt(x, z);
-                if (surface.getType() == Material.WATER) {
-                    surface.setType(Material.ICE, false);
+    /** 플레이어들 주변 지표수를 얼음으로 바꾼다. 범위가 겹치는 칸은 한 번만 처리한다. */
+    private void freezeNearbyWater(World world, List<Player> players, double radius) {
+        int r = (int) Math.ceil(radius);
+        double radiusSquared = radius * radius;
+        Set<Long> visited = new HashSet<>();
+
+        for (Player player : players) {
+            int centerX = player.getLocation().getBlockX();
+            int centerZ = player.getLocation().getBlockZ();
+
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    if (dx * dx + dz * dz > radiusSquared) {
+                        continue;
+                    }
+                    int x = centerX + dx;
+                    int z = centerZ + dz;
+                    if (!visited.add(columnKey(x, z))) {
+                        continue;
+                    }
+                    Block surface = world.getHighestBlockAt(x, z);
+                    if (surface.getType() == Material.WATER) {
+                        surface.setType(Material.ICE, false);
+                    }
                 }
             }
         }
     }
 
     /**
-     * 플레이어 주변의 단단한 지형 위에 실제 눈(SNOW) 블록을 한 겹씩 쌓는다. 한 블록이 maxLayersPerBlock까지
+     * 플레이어들 주변의 단단한 지형 위에 실제 눈(SNOW) 블록을 한 겹씩 쌓는다. 한 블록이 maxLayersPerBlock까지
      * 다 차면, 그 위에 새 눈 블록을 놓아 눈이 계속 더 높이 쌓이게 한다(최대 {@link #MAX_SNOW_COLUMN_HEIGHT}블록 높이까지).
      * heatSources 중 하나라도 heatSourceRadius 안에 있는 칸은 건너뛴다(그 열원 주변만 눈이 안 쌓임).
+     * 플레이어들의 범위가 겹치는 칸은 한 번만 처리한다.
      */
-    private void accumulateSnow(World world, Player player, double radius, int maxLayersPerBlock,
+    private void accumulateSnow(World world, List<Player> players, double radius, int maxLayersPerBlock,
                                  List<Block> heatSources, double heatSourceRadius) {
         int r = (int) Math.ceil(radius);
-        int centerX = player.getLocation().getBlockX();
-        int centerZ = player.getLocation().getBlockZ();
         double radiusSquared = radius * radius;
         double heatSourceRadiusSquared = heatSourceRadius * heatSourceRadius;
+        Set<Long> visited = new HashSet<>();
 
-        for (int dx = -r; dx <= r; dx++) {
-            for (int dz = -r; dz <= r; dz++) {
-                if (dx * dx + dz * dz > radiusSquared) {
-                    continue;
-                }
-                int x = centerX + dx;
-                int z = centerZ + dz;
-                int surfaceY = world.getHighestBlockYAt(x, z);
-                if (isNearAnyHeatSource(x, surfaceY + 1, z, heatSources, heatSourceRadiusSquared)) {
-                    continue;
-                }
-                Block ground = world.getBlockAt(x, surfaceY, z);
-                if (ground.getType() == Material.LAVA) {
-                    // 한파에 용암 표면이 굳어 조약돌이 된다. 그 위에는 눈이 쌓일 수 있다.
-                    ground.setType(Material.COBBLESTONE, false);
-                } else if (!ground.getType().isSolid()) {
-                    // 물 위에는 쌓이지 않는다(freezeNearbyWater가 먼저 얼려야 그 위에 눈이 쌓일 수 있다). 얼음 위에는 쌓인다.
-                    continue;
-                }
+        for (Player player : players) {
+            int centerX = player.getLocation().getBlockX();
+            int centerZ = player.getLocation().getBlockZ();
 
-                // 이미 쌓인 눈 기둥의 꼭대기를 찾는다.
-                int topY = surfaceY;
-                while (topY < surfaceY + MAX_SNOW_COLUMN_HEIGHT
-                        && world.getBlockAt(x, topY + 1, z).getType() == Material.SNOW) {
-                    topY++;
-                }
-
-                if (topY == surfaceY) {
-                    // 아직 눈이 하나도 없는 자리라면 새로 한 블록 놓는다. 낙엽/잔디 같은 낮은 자연물은 먼저 치운다.
-                    Block spot = world.getBlockAt(x, surfaceY + 1, z);
-                    Material spotType = spot.getType();
-                    if (spotType == Material.AIR) {
-                        spot.setType(Material.SNOW, false);
-                    } else if (LOW_VEGETATION.contains(spotType)) {
-                        clearVegetation(world, x, surfaceY + 1, z, spotType);
-                        spot.setType(Material.SNOW, false);
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    if (dx * dx + dz * dz > radiusSquared) {
+                        continue;
                     }
-                    continue;
-                }
+                    int x = centerX + dx;
+                    int z = centerZ + dz;
+                    if (!visited.add(columnKey(x, z))) {
+                        continue;
+                    }
+                    int surfaceY = world.getHighestBlockYAt(x, z);
+                    if (isNearAnyHeatSource(x, surfaceY + 1, z, heatSources, heatSourceRadiusSquared)) {
+                        continue;
+                    }
+                    Block ground = world.getBlockAt(x, surfaceY, z);
+                    if (ground.getType() == Material.LAVA) {
+                        // 한파에 용암 표면이 굳어 조약돌이 된다. 그 위에는 눈이 쌓일 수 있다.
+                        ground.setType(Material.COBBLESTONE, false);
+                    } else if (!ground.getType().isSolid()) {
+                        // 물 위에는 쌓이지 않는다(freezeNearbyWater가 먼저 얼려야 그 위에 눈이 쌓일 수 있다). 얼음 위에는 쌓인다.
+                        continue;
+                    }
 
-                Block topSnowBlock = world.getBlockAt(x, topY, z);
-                Snow snow = (Snow) topSnowBlock.getBlockData();
-                // 설정값과 무관하게, 실제 게임 시스템상의 한 블록당 최대 층수를 넘지 않는다.
-                int trueMaxLayers = Math.min(maxLayersPerBlock, snow.getMaximumLayers());
-                if (snow.getLayers() < trueMaxLayers) {
-                    snow.setLayers(snow.getLayers() + 1);
-                    topSnowBlock.setBlockData(snow, false);
-                } else if (topY < surfaceY + MAX_SNOW_COLUMN_HEIGHT) {
-                    // 이 블록은 다 찼으니, 그 위에 새 눈 블록을 놓아 눈이 계속 더 쌓이게 한다.
-                    Block above = world.getBlockAt(x, topY + 1, z);
-                    if (above.getType() == Material.AIR) {
-                        above.setType(Material.SNOW, false);
+                    // 이미 쌓인 눈 기둥의 꼭대기를 찾는다.
+                    int topY = surfaceY;
+                    while (topY < surfaceY + MAX_SNOW_COLUMN_HEIGHT
+                            && world.getBlockAt(x, topY + 1, z).getType() == Material.SNOW) {
+                        topY++;
+                    }
+
+                    if (topY == surfaceY) {
+                        // 아직 눈이 하나도 없는 자리라면 새로 한 블록 놓는다. 낙엽/잔디 같은 낮은 자연물은 먼저 치운다.
+                        Block spot = world.getBlockAt(x, surfaceY + 1, z);
+                        Material spotType = spot.getType();
+                        if (spotType == Material.AIR) {
+                            spot.setType(Material.SNOW, false);
+                        } else if (LOW_VEGETATION.contains(spotType)) {
+                            clearVegetation(world, x, surfaceY + 1, z, spotType);
+                            spot.setType(Material.SNOW, false);
+                        }
+                        continue;
+                    }
+
+                    Block topSnowBlock = world.getBlockAt(x, topY, z);
+                    Snow snow = (Snow) topSnowBlock.getBlockData();
+                    // 설정값과 무관하게, 실제 게임 시스템상의 한 블록당 최대 층수를 넘지 않는다.
+                    int trueMaxLayers = Math.min(maxLayersPerBlock, snow.getMaximumLayers());
+                    if (snow.getLayers() < trueMaxLayers) {
+                        snow.setLayers(snow.getLayers() + 1);
+                        topSnowBlock.setBlockData(snow, false);
+                    } else if (topY < surfaceY + MAX_SNOW_COLUMN_HEIGHT) {
+                        // 이 블록은 다 찼으니, 그 위에 새 눈 블록을 놓아 눈이 계속 더 쌓이게 한다.
+                        Block above = world.getBlockAt(x, topY + 1, z);
+                        if (above.getType() == Material.AIR) {
+                            above.setType(Material.SNOW, false);
+                        }
                     }
                 }
             }
@@ -265,31 +291,41 @@ public class BlizzardDisaster implements Disaster {
         return false;
     }
 
-    /** 플레이어 주변(3차원 반경) 안에 있는, 켜져 있는 열원(횃불/모닥불/랜턴, 영혼 포함) 블록을 모두 찾아 반환한다. */
-    private List<Block> findHeatSources(World world, Player player, double radius) {
+    /**
+     * 플레이어들 주변(3차원 반경) 안에 있는, 켜져 있는 열원(횃불/모닥불/랜턴, 영혼 포함) 블록을 모두 찾아 반환한다.
+     * 플레이어들의 범위가 겹쳐도 같은 블록은 한 번만 검사·반환한다.
+     */
+    private List<Block> findHeatSources(World world, List<Player> players, double radius) {
         List<Block> found = new ArrayList<>();
+        Set<Block> visited = new HashSet<>();
         int r = (int) Math.ceil(radius);
         double radiusSquared = radius * radius;
-        Location center = player.getLocation();
-        int centerX = center.getBlockX();
-        int centerY = center.getBlockY();
-        int centerZ = center.getBlockZ();
 
-        for (int dx = -r; dx <= r; dx++) {
-            for (int dy = -r; dy <= r; dy++) {
-                for (int dz = -r; dz <= r; dz++) {
-                    if (dx * dx + dy * dy + dz * dz > radiusSquared) {
-                        continue;
+        for (Player player : players) {
+            Location center = player.getLocation();
+            int centerX = center.getBlockX();
+            int centerY = center.getBlockY();
+            int centerZ = center.getBlockZ();
+
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dy = -r; dy <= r; dy++) {
+                    for (int dz = -r; dz <= r; dz++) {
+                        if (dx * dx + dy * dy + dz * dz > radiusSquared) {
+                            continue;
+                        }
+                        Block block = world.getBlockAt(centerX + dx, centerY + dy, centerZ + dz);
+                        if (!visited.add(block)) {
+                            continue;
+                        }
+                        if (!HEAT_SOURCES.contains(block.getType())) {
+                            continue;
+                        }
+                        // 모닥불류는 꺼져 있으면 열원으로 치지 않는다. 횃불/랜턴은 항상 켜진 상태만 존재한다.
+                        if (block.getBlockData() instanceof Lightable lightable && !lightable.isLit()) {
+                            continue;
+                        }
+                        found.add(block);
                     }
-                    Block block = world.getBlockAt(centerX + dx, centerY + dy, centerZ + dz);
-                    if (!HEAT_SOURCES.contains(block.getType())) {
-                        continue;
-                    }
-                    // 모닥불류는 꺼져 있으면 열원으로 치지 않는다. 횃불/랜턴은 항상 켜진 상태만 존재한다.
-                    if (block.getBlockData() instanceof Lightable lightable && !lightable.isLit()) {
-                        continue;
-                    }
-                    found.add(block);
                 }
             }
         }
