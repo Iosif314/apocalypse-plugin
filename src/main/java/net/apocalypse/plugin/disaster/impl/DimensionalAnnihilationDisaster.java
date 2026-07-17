@@ -4,6 +4,7 @@ import net.apocalypse.plugin.disaster.DangerLevel;
 import net.apocalypse.plugin.disaster.Disaster;
 import net.apocalypse.plugin.disaster.DisasterContext;
 import net.apocalypse.plugin.util.ColorUtil;
+import net.apocalypse.plugin.util.PlayerFilter;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -70,7 +71,7 @@ public class DimensionalAnnihilationDisaster implements Disaster {
             Player target = initialTarget;
             if (!target.isOnline()) {
                 // 그 사이 타겟이 접속을 종료했으면, 그 시점에 그 월드에 있는 플레이어 중 새로 하나를 다시 뽑는다.
-                List<Player> onlineNow = world.getPlayers();
+                List<Player> onlineNow = PlayerFilter.targetable(world.getPlayers());
                 if (onlineNow.isEmpty()) {
                     return;
                 }
@@ -94,7 +95,9 @@ public class DimensionalAnnihilationDisaster implements Disaster {
     private void annihilateChunk(World world, Chunk chunk, double playerDamage) {
         for (Entity entity : chunk.getEntities()) {
             if (entity instanceof Player player) {
-                player.damage(playerDamage);
+                if (PlayerFilter.isTargetable(player)) {
+                    player.damage(playerDamage);
+                }
             } else {
                 entity.remove();
             }

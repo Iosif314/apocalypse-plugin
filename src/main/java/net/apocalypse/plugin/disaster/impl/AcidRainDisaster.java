@@ -3,6 +3,7 @@ package net.apocalypse.plugin.disaster.impl;
 import net.apocalypse.plugin.disaster.DangerLevel;
 import net.apocalypse.plugin.disaster.Disaster;
 import net.apocalypse.plugin.disaster.DisasterContext;
+import net.apocalypse.plugin.util.PlayerFilter;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
@@ -69,7 +70,7 @@ public class AcidRainDisaster implements Disaster {
     /** 비를 맞고 있는 플레이어들에게 시듦 효과를 걸거나 갱신한다. */
     private void applyAcidRain(World world, int amplifier, int effectDurationTicks) {
         for (Player player : world.getPlayers()) {
-            if (isExposedToRain(world, player)) {
+            if (PlayerFilter.isTargetable(player) && isExposedToRain(world, player)) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, effectDurationTicks, amplifier, true, true));
             }
         }

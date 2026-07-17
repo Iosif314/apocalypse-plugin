@@ -157,7 +157,7 @@ disasters:
     wind-sound-pitch: 0.6
 
     # 동시에 발생하는 회오리(토네이도) 개수. 각각 무작위 플레이어(타겟)의 x/z ± tornado-spawn-offset-radius 위치에서 시작해 지형 위를 서서히 떠돕니다.
-    tornado-count: 2
+    tornado-count: 1
     # 회오리 생성 위치가 타겟 플레이어의 x/z 좌표로부터 벗어나는 최대 범위(블록). 이 범위 안에서 무작위로 정해집니다.
     tornado-spawn-offset-radius: 75
     # 회오리의 이동/파티클/엔티티 흡입이 갱신되는 주기(틱). 작을수록 더 부드럽게 움직이지만 서버 부하가 커집니다.
@@ -268,7 +268,7 @@ disasters:
     # 판정 주기마다 열원 근처가 아닌 플레이어가 입는 동상 데미지
     frostbite-damage: 1.0
     # 하늘이 뚫려 있으면서 열원 근처도 아닌 플레이어 기준 이 반경(블록) 안의 단단한 지형 위에 실제로 눈을 쌓습니다.
-    snow-accumulation-radius: 256
+    snow-accumulation-radius: 128
     # 눈 블록 한 칸이 쌓을 수 있는 최대 층수 (1~8, 마인크래프트 시스템상 한계도 8입니다). 판정 주기마다 한 층씩 늘어나고,
     # 다 차면 그 위에 새 눈 블록이 쌓입니다.
     snow-max-layers: 8
@@ -278,7 +278,7 @@ disasters:
     wind-sound-volume: 1.0
     wind-sound-pitch: 0.6
     # 하늘이 뚫린 곳에 있는 플레이어 기준 이 반경(블록) 안의 지표수를 얼음으로 바꿉니다. 열원과는 무관합니다.
-    ice-freeze-radius: 256
+    ice-freeze-radius: 128
 
     warning-message: "&c&l공기가 급격히 차가워지며 살을 에는 듯한 한기가 느껴집니다... 곧 한파가 몰아칩니다!"
     appear-message: "&4&l한파가 몰아치기 시작했습니다!"

@@ -1,6 +1,7 @@
 package net.apocalypse.plugin.disaster;
 
 import net.apocalypse.plugin.util.ColorUtil;
+import net.apocalypse.plugin.util.PlayerFilter;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -139,7 +140,7 @@ public class DisasterManager {
             double chancePercent = plugin.getConfig().getDouble(base + "auto-trigger-chance", dangerLevel.getDefaultTriggerChancePercent());
             if (random.nextDouble() * 100.0 < chancePercent) {
                 List<World> candidateWorlds = getConfiguredWorlds();
-                candidateWorlds.removeIf(w -> w.getPlayers().isEmpty());
+                candidateWorlds.removeIf(w -> PlayerFilter.targetable(w.getPlayers()).isEmpty());
                 if (!candidateWorlds.isEmpty()) {
                     World world = candidateWorlds.get(random.nextInt(candidateWorlds.size()));
                     executeDisaster(disaster, world, false, true);
@@ -162,7 +163,7 @@ public class DisasterManager {
      */
     public boolean triggerRandomDisaster(boolean immediate) {
         List<World> candidateWorlds = getConfiguredWorlds();
-        candidateWorlds.removeIf(w -> w.getPlayers().isEmpty());
+        candidateWorlds.removeIf(w -> PlayerFilter.targetable(w.getPlayers()).isEmpty());
         if (candidateWorlds.isEmpty()) {
             return false;
         }
@@ -213,7 +214,7 @@ public class DisasterManager {
         }
 
         Runnable spawn = () -> {
-            List<Player> players = new ArrayList<>(world.getPlayers());
+            List<Player> players = PlayerFilter.targetable(world.getPlayers());
             if (players.isEmpty()) {
                 return;
             }

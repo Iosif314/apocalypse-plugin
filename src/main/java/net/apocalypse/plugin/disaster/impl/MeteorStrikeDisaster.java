@@ -4,6 +4,7 @@ import net.apocalypse.plugin.disaster.DangerLevel;
 import net.apocalypse.plugin.disaster.Disaster;
 import net.apocalypse.plugin.disaster.DisasterContext;
 import net.apocalypse.plugin.util.ColorUtil;
+import net.apocalypse.plugin.util.PlayerFilter;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -219,6 +220,9 @@ public class MeteorStrikeDisaster implements Disaster {
             if (!(entity instanceof LivingEntity living)) {
                 continue;
             }
+            if (entity instanceof Player player && !PlayerFilter.isTargetable(player)) {
+                continue;
+            }
             if (!hitEntities.add(entity.getUniqueId())) {
                 continue;
             }
@@ -238,6 +242,9 @@ public class MeteorStrikeDisaster implements Disaster {
         }
         for (Entity entity : world.getNearbyEntities(center, radius, radius, radius)) {
             if (!(entity instanceof LivingEntity living)) {
+                continue;
+            }
+            if (entity instanceof Player player && !PlayerFilter.isTargetable(player)) {
                 continue;
             }
             if (alreadyHit.contains(entity.getUniqueId())) {

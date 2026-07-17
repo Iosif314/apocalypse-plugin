@@ -3,6 +3,7 @@ package net.apocalypse.plugin.disaster.impl;
 import net.apocalypse.plugin.disaster.DangerLevel;
 import net.apocalypse.plugin.disaster.Disaster;
 import net.apocalypse.plugin.disaster.DisasterContext;
+import net.apocalypse.plugin.util.PlayerFilter;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
@@ -86,7 +87,7 @@ public class ZombieOutbreakDisaster implements Disaster {
         Map<UUID, Zombie> disguisePuppets = new HashMap<>();
 
         // 좀비는 주기적인 웨이브가 아니라, 발동 시점에 플레이어마다 한 번에 몰아서 소환한다.
-        for (Player player : world.getPlayers()) {
+        for (Player player : PlayerFilter.targetable(world.getPlayers())) {
             spawnZombieWave(world, player.getLocation(), minZombies, maxZombies, spawnRadius);
         }
 
@@ -123,7 +124,7 @@ public class ZombieOutbreakDisaster implements Disaster {
     private void updateDisguises(Plugin plugin, World world, NamespacedKey key, double groupRadius,
                                   Map<UUID, Zombie> disguisePuppets, long checkIntervalTicks, int slownessAmplifier,
                                   NamespacedKey jumpModifierKey, double jumpStrengthReduction) {
-        List<Player> players = world.getPlayers();
+        List<Player> players = PlayerFilter.targetable(world.getPlayers());
         Set<UUID> stillPresent = new HashSet<>();
         // 효과가 다음 갱신 전에 끊기지 않도록 체크 주기보다 살짝 여유를 둔다.
         int effectDuration = (int) (checkIntervalTicks * 3);

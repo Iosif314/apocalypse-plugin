@@ -4,6 +4,7 @@ import net.apocalypse.plugin.disaster.DangerLevel;
 import net.apocalypse.plugin.disaster.Disaster;
 import net.apocalypse.plugin.disaster.DisasterContext;
 import net.apocalypse.plugin.util.ColorUtil;
+import net.apocalypse.plugin.util.PlayerFilter;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.World;
@@ -92,7 +93,7 @@ public class PlagueDisaster implements Disaster {
 
                 for (UUID id : new ArrayList<>(INFECTED_PLAYERS)) {
                     Player carrier = Bukkit.getPlayer(id);
-                    if (carrier == null || !carrier.isOnline()) {
+                    if (carrier == null || !carrier.isOnline() || !PlayerFilter.isTargetable(carrier)) {
                         continue;
                     }
                     applySymptoms(carrier, symptomDurationTicks, slownessAmplifier, weaknessAmplifier,
@@ -127,6 +128,9 @@ public class PlagueDisaster implements Disaster {
     /** 감염자 주변 반경 안의 아직 감염되지 않은 플레이어에게 확률적으로 전염시킨다. */
     private void spreadToNearbyPlayers(World world, Player carrier, double radius, int chancePercent, String infectedMessage) {
         for (Player nearby : world.getPlayers()) {
+            if (!PlayerFilter.isTargetable(nearby)) {
+                continue;
+            }
             if (INFECTED_PLAYERS.contains(nearby.getUniqueId())) {
                 continue;
             }

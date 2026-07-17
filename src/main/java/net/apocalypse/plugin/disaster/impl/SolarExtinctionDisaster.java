@@ -3,6 +3,7 @@ package net.apocalypse.plugin.disaster.impl;
 import net.apocalypse.plugin.disaster.DangerLevel;
 import net.apocalypse.plugin.disaster.Disaster;
 import net.apocalypse.plugin.disaster.DisasterContext;
+import net.apocalypse.plugin.util.PlayerFilter;
 import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -74,7 +75,7 @@ public class SolarExtinctionDisaster implements Disaster {
     /** 하늘이 뚫린 곳에 있는 플레이어들에게 어둠 효과를 걸거나 갱신한다. */
     private void applyDarknessToExposedPlayers(World world, int durationTicks) {
         for (Player player : world.getPlayers()) {
-            if (isExposedToSky(world, player)) {
+            if (PlayerFilter.isTargetable(player) && isExposedToSky(world, player)) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, durationTicks, 0, true, false));
             }
         }

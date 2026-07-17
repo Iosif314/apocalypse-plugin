@@ -3,6 +3,7 @@ package net.apocalypse.plugin.disaster.impl;
 import net.apocalypse.plugin.disaster.DangerLevel;
 import net.apocalypse.plugin.disaster.Disaster;
 import net.apocalypse.plugin.disaster.DisasterContext;
+import net.apocalypse.plugin.util.PlayerFilter;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
@@ -125,7 +126,7 @@ public class StormDisaster implements Disaster {
         new BukkitRunnable() {
             @Override
             public void run() {
-                List<Player> players = world.getPlayers();
+                List<Player> players = PlayerFilter.targetable(world.getPlayers());
                 for (int i = 0; i < tornadoCount && !players.isEmpty(); i++) {
                     Player target = players.get(random.nextInt(players.size()));
                     Location targetLoc = target.getLocation();
@@ -336,6 +337,9 @@ public class StormDisaster implements Disaster {
     /** 각 플레이어마다 확률을 굴려서, 통과하면 그 주변 반경 안 랜덤 위치에 실제 낙뢰(피해/화재 있음)를 떨어뜨린다. */
     private void strikeLightningNearPlayers(World world, double chancePercent, double radius) {
         for (Player player : world.getPlayers()) {
+            if (!PlayerFilter.isTargetable(player)) {
+                continue;
+            }
             if (random.nextDouble() * 100.0 >= chancePercent) {
                 continue;
             }
@@ -354,14 +358,16 @@ public class StormDisaster implements Disaster {
         double angle = random.nextDouble() * 2 * Math.PI;
         Vector push = new Vector(Math.cos(angle) * force, 0.15, Math.sin(angle) * force);
         for (Player player : world.getPlayers()) {
-            player.setVelocity(player.getVelocity().add(push));
+            if (PlayerFilter.isTargetable(player)) {
+                player.setVelocity(player.getVelocity().add(push));
+            }
         }
     }
 
     /** 지상(하늘이 뚫린 곳)에 있는 플레이어에게만 칼바람 소리를 들려준다. */
     private void playWindSoundToExposedPlayers(World world, float volume, float pitch) {
         for (Player player : world.getPlayers()) {
-            if (isExposedToSky(world, player)) {
+            if (PlayerFilter.isTargetable(player) && isExposedToSky(world, player)) {
                 player.playSound(player.getLocation(), Sound.ENTITY_BREEZE_WHIRL, volume, pitch);
             }
         }
@@ -382,6 +388,9 @@ public class StormDisaster implements Disaster {
 
         for (Entity entity : nearby) {
             if (!(entity instanceof LivingEntity living)) {
+                continue;
+            }
+            if (entity instanceof Player player && !PlayerFilter.isTargetable(player)) {
                 continue;
             }
             Location loc = entity.getLocation();

@@ -3,6 +3,7 @@ package net.apocalypse.plugin.disaster.impl;
 import net.apocalypse.plugin.disaster.DangerLevel;
 import net.apocalypse.plugin.disaster.Disaster;
 import net.apocalypse.plugin.disaster.DisasterContext;
+import net.apocalypse.plugin.util.PlayerFilter;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
@@ -103,6 +104,9 @@ public class BlizzardDisaster implements Disaster {
                 }
 
                 for (Player player : world.getPlayers()) {
+                    if (!PlayerFilter.isTargetable(player)) {
+                        continue;
+                    }
                     spawnSnow(world, player, snowParticleCount, snowParticleRadius);
 
                     boolean exposed = isExposedToSky(world, player);
